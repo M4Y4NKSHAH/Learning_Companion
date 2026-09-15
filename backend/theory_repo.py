@@ -22,8 +22,22 @@ FLASHCARD_REPOSITORY = {
                 }
             ],
             "quizzes": [
-                { "id": "p10_q1", "text": "A 10kg structural mass experiences a constant acceleration of 5 m/s². Calculate the active net force vector acting on it in Newtons.", "concept": "Newton's Second Law" },
-                { "id": "p10_q2", "text": "If an automated transport vehicle moves at a perfectly uniform constant velocity of 20 m/s for 10 seconds, what is its rate of acceleration in m/s²?", "concept": "Kinematics" }
+                {
+                    "id": "p10_q1",
+                    "text": "A 10kg structural mass experiences a constant acceleration of 5 m/s². Calculate the active net force vector acting on it in Newtons.",
+                    "concept": "Newton's Second Law",
+                    "expected_answer": "50",
+                    "hint": "Recall Newton's Second Law relating force, mass, and acceleration: Force = Mass * Acceleration (F = m * a). Multiply the given mass by the acceleration.",
+                    "solution": "1. Formula: Net Force F = m * a (Mass * Acceleration)\n2. Given: Mass m = 10 kg, Acceleration a = 5 m/s²\n3. Calculation: F = 10 kg * 5 m/s² = 50 N\n\nDirect Answer: 50 Newtons (N)."
+                },
+                {
+                    "id": "p10_q2",
+                    "text": "If an automated transport vehicle moves at a perfectly uniform constant velocity of 20 m/s for 10 seconds, what is its rate of acceleration in m/s²?",
+                    "concept": "Kinematics",
+                    "expected_answer": "0",
+                    "hint": "Remember the fundamental definition of acceleration: it represents the rate of change of velocity over time. If the velocity is constant and unchanging, does any acceleration occur?",
+                    "solution": "1. Formula: Acceleration a = (v_final - v_initial) / t = Δv / Δt\n2. Given: Velocity is strictly constant at 20 m/s, so Δv = 0 m/s\n3. Calculation: a = 0 m/s / 10 s = 0 m/s²\n\nDirect Answer: 0 m/s²."
+                }
             ],
             "finalExam": [
                 { 
@@ -74,7 +88,14 @@ FLASHCARD_REPOSITORY = {
                 }
             ],
             "quizzes": [
-                { "id": "p12_q1", "text": "A research payload is launched ballistically into a parabolic path. When it reaches its absolute maximum peak height, what is the value of its vertical velocity component in m/s?", "concept": "Projectile Motion" }
+                {
+                    "id": "p12_q1",
+                    "text": "A research payload is launched ballistically into a parabolic path. When it reaches its absolute maximum peak height, what is the value of its vertical velocity component in m/s?",
+                    "concept": "Projectile Motion",
+                    "expected_answer": "0",
+                    "hint": "Consider the vertical motion under gravity: as the projectile rises, gravity decelerates it until it momentarily stops rising at the very apex before descending. What must the vertical velocity be at that exact turning point?",
+                    "solution": "1. Principle: At the vertex of a parabolic trajectory, the vertical velocity vector v_y momentarily drops to zero before reversing direction.\n2. Note: The horizontal velocity v_x remains active and unchanged throughout flight.\n\nDirect Answer: 0 m/s."
+                }
             ],
             "finalExam": [
                 { 
@@ -109,7 +130,14 @@ FLASHCARD_REPOSITORY = {
                 }
             ],
             "quizzes": [
-                { "id": "pug_q1", "text": "What fundamental scalar energy formula connects Kinetic Energy (T) and Potential Energy (V) to define the system Lagrangian (L)?", "concept": "Lagrangian Mechanics" }
+                {
+                    "id": "pug_q1",
+                    "text": "What fundamental scalar energy formula connects Kinetic Energy (T) and Potential Energy (V) to define the system Lagrangian (L)?",
+                    "concept": "Lagrangian Mechanics",
+                    "expected_answer": "L = T - V",
+                    "hint": "In analytical mechanics, the Lagrangian is defined as the difference between the system's kinetic energy and its potential energy (unlike the Hamiltonian which sums them).",
+                    "solution": "1. Principle: The Lagrangian function L represents scalar energy within generalized coordinates.\n2. Formula: Lagrangian (L) = Kinetic Energy (T) - Potential Energy (V)\n\nDirect Answer: L = T - V."
+                }
             ],
             "finalExam": [
                 { 
@@ -146,7 +174,14 @@ FLASHCARD_REPOSITORY = {
                 }
             ],
             "quizzes": [
-                { "id": "b10_q1", "text": "Which membrane-bound organelle acts as the main power plant of eukaryotic cells by generating ATP?", "concept": "Cellular Energy" }
+                {
+                    "id": "b10_q1",
+                    "text": "Which membrane-bound organelle acts as the main power plant of eukaryotic cells by generating ATP?",
+                    "concept": "Cellular Energy",
+                    "expected_answer": "Mitochondria",
+                    "hint": "Think of the double-membraned organelle often called the 'powerhouse of the cell' where cellular respiration and ATP synthesis take place.",
+                    "solution": "1. Principle: Cellular respiration occurs in the mitochondria, where glucose and oxygen are converted into ATP (adenosine triphosphate).\n2. Function: Mitochondria serve as the primary chemical power generator for eukaryotic cells.\n\nDirect Answer: Mitochondria (or Mitochondrion)."
+                }
             ],
             "finalExam": [
                 { 
@@ -181,7 +216,14 @@ FLASHCARD_REPOSITORY = {
                 }
             ],
             "quizzes": [
-                { "id": "b12_q1", "text": "Name the enzyme that unzips the DNA double helix and binds to the promoter region to synthesize mRNA.", "concept": "Transcription Enzymes" }
+                {
+                    "id": "b12_q1",
+                    "text": "Name the enzyme that unzips the DNA double helix and binds to the promoter region to synthesize mRNA.",
+                    "concept": "Transcription Enzymes",
+                    "expected_answer": "RNA Polymerase",
+                    "hint": "This enzyme synthesizes RNA by reading the template DNA strand during transcription. Its name reflects the polymer it constructs.",
+                    "solution": "1. Principle: During transcription, RNA Polymerase recognizes and binds to the promoter sequence, unzips the DNA strands, and catalyzes the synthesis of complementary single-stranded mRNA.\n\nDirect Answer: RNA Polymerase."
+                }
             ],
             "finalExam": [
                 { 
@@ -216,7 +258,14 @@ FLASHCARD_REPOSITORY = {
                 }
             ],
             "quizzes": [
-                { "id": "bug_q1", "text": "Which class of enzymes catalyzes the transfer of methyl groups to histone proteins, causing chromatin condensation?", "concept": "Epigenetic Modification" }
+                {
+                    "id": "bug_q1",
+                    "text": "Which class of enzymes catalyzes the transfer of methyl groups to histone proteins, causing chromatin condensation?",
+                    "concept": "Epigenetic Modification",
+                    "expected_answer": "Histone Methyltransferases",
+                    "hint": "Combine the target substrate (histone), the modifying functional group (methyl), and the standard suffix for enzymes that transfer groups.",
+                    "solution": "1. Principle: Histone Methyltransferases (HMTs) catalyze the transfer of methyl groups from SAM to lysine or arginine residues of histone proteins, altering chromatin structure and silencing transcription.\n\nDirect Answer: Histone Methyltransferases (HMTs)."
+                }
             ],
             "finalExam": [
                 { 
@@ -253,7 +302,14 @@ FLASHCARD_REPOSITORY = {
                 }
             ],
             "quizzes": [
-                { "id": "m10_q1", "text": "In the linear algebraic equation 2x - 5 = 11, what is the value of x?", "concept": "Linear Equations" }
+                {
+                    "id": "m10_q1",
+                    "text": "In the linear algebraic equation 2x - 5 = 11, what is the value of x?",
+                    "concept": "Linear Equations",
+                    "expected_answer": "8",
+                    "hint": "Isolate the variable term: first add 5 to both sides of the equation, then divide both sides by the coefficient 2.",
+                    "solution": "1. Given Equation: 2x - 5 = 11\n2. Step 1: Add 5 to both sides: 2x = 11 + 5 = 16\n3. Step 2: Divide both sides by 2: x = 16 / 2 = 8\n\nDirect Answer: x = 8."
+                }
             ],
             "finalExam": [
                 { 
@@ -288,7 +344,14 @@ FLASHCARD_REPOSITORY = {
                 }
             ],
             "quizzes": [
-                { "id": "m12_q1", "text": "Using the power rule, find the derivative of the function f(x) = 4x³ - 5x.", "concept": "The Power Rule" }
+                {
+                    "id": "m12_q1",
+                    "text": "Using the power rule, find the derivative of the function f(x) = 4x³ - 5x.",
+                    "concept": "The Power Rule",
+                    "expected_answer": "12x^2 - 5",
+                    "hint": "Apply the power rule d/dx [x^n] = n * x^(n-1) to each term independently. Remember that the derivative of 4x³ involves 4 * 3, and the derivative of -5x is simply the coefficient -5.",
+                    "solution": "1. Given Function: f(x) = 4x³ - 5x\n2. Step 1: Differentiate 4x³ using power rule: 4 * 3 * x^(3-1) = 12x²\n3. Step 2: Differentiate -5x: -5 * 1 = -5\n4. Step 3: Combine derivatives: f'(x) = 12x² - 5\n\nDirect Answer: 12x^2 - 5."
+                }
             ],
             "finalExam": [
                 { 
@@ -323,7 +386,14 @@ FLASHCARD_REPOSITORY = {
                 }
             ],
             "quizzes": [
-                { "id": "mug_q1", "text": "Evaluate the definite integral of f(x) = 2x from x = 1 to x = 3 using the Fundamental Theorem of Calculus.", "concept": "Fundamental Theorem of Calculus" }
+                {
+                    "id": "mug_q1",
+                    "text": "Evaluate the definite integral of f(x) = 2x from x = 1 to x = 3 using the Fundamental Theorem of Calculus.",
+                    "concept": "Fundamental Theorem of Calculus",
+                    "expected_answer": "8",
+                    "hint": "First determine the antiderivative F(x) of 2x (which is x²). Then evaluate F(3) - F(1) by substituting the upper and lower limits.",
+                    "solution": "1. Given Integral: Integral from 1 to 3 of 2x dx\n2. Antiderivative: F(x) = x²\n3. Evaluate at Upper Limit: F(3) = 3² = 9\n4. Evaluate at Lower Limit: F(1) = 1² = 1\n5. Fundamental Theorem: F(3) - F(1) = 9 - 1 = 8\n\nDirect Answer: 8."
+                }
             ],
             "finalExam": [
                 { 
