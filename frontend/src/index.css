@@ -2,45 +2,72 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Core Application Reset Layer */
+/* Core Application Reset Layer — Japandi "washi paper" surface */
 @layer base {
   body {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    background-color: #020617; /* Slate-950 Dark Engine Background */
+    /* sand-950 rice paper (#EAE4D8) plus two whisper-soft cedar / moss washes so the
+       surface reads as layered handmade paper instead of flat white. No image assets. */
+    background-color: #eae4d8;
+    background-image:
+      radial-gradient(1200px 720px at 12% -12%, rgba(165, 98, 58, 0.07), transparent 62%),
+      radial-gradient(1000px 680px at 92% 108%, rgba(94, 122, 62, 0.06), transparent 60%);
+    background-attachment: fixed;
+    color: #2b2723; /* sand-100 ink */
     font-family: 'Outfit', ui-sans-serif, system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Sumi-ink selection, paper text — quieter than a saturated accent block. */
+  ::selection {
+    background: #2b2723;
+    color: #f4efe6;
+  }
+
+  /* Quiet keyboard focus: a thin cedar hairline rather than a chrome-y glow. */
+  :focus-visible {
+    outline: 2px solid rgba(165, 98, 58, 0.55);
+    outline-offset: 2px;
   }
 }
 
 /* Custom Telemetry Dashboard Layout Styles */
 @layer utilities {
-  /* Elegant Dark Scrollbars for Interaction Logs and RAG Streams */
+  /* Warm paper scrollbars for interaction logs and RAG streams */
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
 
   .custom-scrollbar::-webkit-scrollbar-track {
-    background: #020617; /* Matches Slate-950 */
+    background: #eae4d8; /* Matches sand-950 rice paper */
     border-radius: 4px;
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #334155; /* Slate-700 Track Line */
+    background: #c2b9ab; /* sand-700 hairline stone */
     border-radius: 4px;
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: #475569; /* Slate-600 Highlight on Hover */
+    background: #a9a196; /* sand-600 pale stone */
   }
 
   /* Smooth dynamic fading edge effect for streaming text frames */
   .mask-fading-edge {
     mask-image: linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transparent 100%);
     -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transparent 100%);
+  }
+
+  /* Legacy dark-palette screenshots (hero + gallery assets) printed onto the washi page:
+     inverting turns the navy UI into paper and its cool accents into warm ones, then the
+     saturation drop + sepia pull them to the japandi naturals. Replace the PNGs with real
+     light-theme captures and this class can go. */
+  .japandi-plate {
+    filter: invert(1) saturate(0.42) sepia(0.14) contrast(0.94) brightness(1.03);
   }
 }
 
@@ -89,38 +116,42 @@
   align-items: flex-start;
 }
 
-/* Glassmorphism & Glow Effects */
+/* Washi paper panels: translucent rice paper + hairline ink edge + soft diffused shadow.
+   Japandi avoids gloss, so the old heavy glassmorphism is toned down to matte paper. */
 .glass-panel {
-  background: rgba(15, 23, 42, 0.65);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(250, 246, 239, 0.78); /* sand-900 washi @ 78% */
+  backdrop-filter: blur(10px) saturate(105%);
+  -webkit-backdrop-filter: blur(10px) saturate(105%);
+  border: 1px solid rgba(43, 39, 35, 0.09);
+  box-shadow: 0 14px 34px -26px rgba(43, 39, 35, 0.28);
 }
 
-.glow-blue {
-  box-shadow: 0 0 25px -5px rgba(59, 130, 246, 0.15);
+/* Subject / surface halos tuned to the japandi accents — soft cedar, moss and clay light
+   instead of a neon glow (same class names, quieter behaviour). */
+.glow-ember {
+  box-shadow: 0 18px 44px -26px rgba(138, 75, 42, 0.45);
 }
 
-.glow-emerald {
-  box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.15);
+.glow-olive {
+  box-shadow: 0 18px 44px -26px rgba(74, 101, 48, 0.45);
 }
 
-.glow-purple {
-  box-shadow: 0 0 25px -5px rgba(139, 92, 246, 0.15);
+.glow-clay {
+  box-shadow: 0 18px 44px -26px rgba(154, 74, 70, 0.45);
 }
 
 @keyframes pulse-ring {
   0% {
     transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+    box-shadow: 0 0 0 0 rgba(165, 98, 58, 0.35);
   }
   70% {
     transform: scale(1);
-    box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+    box-shadow: 0 0 0 10px rgba(165, 98, 58, 0);
   }
   100% {
     transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+    box-shadow: 0 0 0 0 rgba(165, 98, 58, 0);
   }
 }
 
@@ -180,7 +211,7 @@
   animation: gradient-shift 6s ease infinite;
 }
 
-/* pulsing glow that fades in/out on cards */
+/* pulsing depth that fades in/out on cards (was a glow, now a soft wash) */
 @keyframes glow-pulse {
   0%, 100% {
     opacity: 0.4;
@@ -194,7 +225,7 @@
   animation: glow-pulse 4s ease-in-out infinite;
 }
 
-/* shimmer sweep across cards */
+/* shimmer sweep across cards — a pale ink sheen on paper */
 @keyframes shimmer {
   0% {
     transform: translateX(-150%) skewX(-20deg);
@@ -208,7 +239,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.06) 50%, transparent 60%);
+  background: linear-gradient(105deg, transparent 40%, rgba(43, 39, 35, 0.05) 50%, transparent 60%);
   animation: shimmer 3.5s infinite;
   pointer-events: none;
 }
