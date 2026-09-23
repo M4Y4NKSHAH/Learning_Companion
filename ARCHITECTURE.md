@@ -154,7 +154,7 @@ frontend/
 └─ src/
    ├─ main.jsx               # React root (StrictMode)
    ├─ App.jsx                # Dashboard + app shell (single-file surface)
-   ├─ index.css              # Tailwind + glass/glow/flip-card/animation utilities
+   ├─ index.css              # Tailwind + washi-panel/halo/flip-card/animation utilities
    ├─ components/
    │  ├─ LandingPage.jsx     # Marketing page: hero, subjects/levels, modal, gallery
    │  └─ Reveal.jsx          # Scroll-triggered reveal wrapper

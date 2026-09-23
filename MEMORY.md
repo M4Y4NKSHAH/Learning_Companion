@@ -63,7 +63,8 @@ reports *which cognitive node* is active (Surface / Deep / Direct) — that's th
 4. **One knowledge base:** ChromaDB `curriculum_repository` seeded from OpenStax `.txt`
    files; queried with `subject` + `academic_tier` metadata filters.
 5. **One UI surface reuse:** `App.jsx` owns the dashboard; `LandingPage.jsx` owns
-   marketing + subject/level selection; everything is dark-slate "glass".
+   marketing + subject/level selection; everything is the light Japandi "washi paper"
+   surface (`sand` ink/paper + `ember` / `olive` / `clay` naturals).
 
 ---
 
@@ -82,6 +83,14 @@ reports *which cognitive node* is active (Surface / Deep / Direct) — that's th
 - **Hints never leak the answer** — run output through `hint_utils.sanitize_*`.
 - **Flashcards are cached** per `(subject, tier)`; don't call Gemini in a loop.
 - **LLM model:** `gemini-2.5-flash` everywhere (do not diverge without reason).
+- **UI theme tokens:** the frontend uses the custom Japandi palette in
+  `frontend/tailwind.config.js` (`japandiPalette`) — `sand` for paper/ink neutrals (replaced
+  `slate`), `ember` for primary/Physics (replaced `blue`), `olive` for Biology (replaced
+  `emerald`), `clay` for Mathematics/hints (replaced `purple` + `rose`), Tailwind
+  `amber`/`yellow` kept for warnings and ratings. The neutral ramp is **inverted** (`sand-50` =
+  sumi ink, `sand-950` = rice paper), `text-white` is only valid on `*-600` accent fills, and
+  overlay scrims are ink (`bg-sand-50/65`…`/85`). Don't add the retired cool families; see
+  [DESIGN.md](./DESIGN.md) §2.
 ---
 
 ## 6. Decision Log (Why It's Built This Way)
@@ -118,7 +127,9 @@ reports *which cognitive node* is active (Surface / Deep / Direct) — that's th
 - **Active branch:** `feature-landing-page` (merged with `main`).
 - **Recent changes:** responsive fixes on small screens, landing-page image rollback/fix,
   scroll animations (`Reveal.jsx`, `animate-*` utilities), subject/level selection modal,
-  gallery lightbox with keyboard navigation.
+  gallery lightbox with keyboard navigation, the warm "ember" retheme of the whole frontend
+  (`sand` / `ember` / `olive` / `clay` tokens), and then the light **Japandi** retheme
+  (washi paper + sumi ink, inverted neutral ramp, matte panels — [DESIGN.md](./DESIGN.md) §2).
 - **Financial/cost note:** flashcard generation and hint generation hit the Gemini API;
   throttled by in-memory caching but there is **no persistent user database yet** — state
   is session-only on the frontend.
