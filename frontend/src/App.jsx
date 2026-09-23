@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import LandingPage from './components/LandingPage';
+import AuthPage from './components/AuthPage';
 import MaterialIngestionModal from './components/MaterialIngestionModal';
 import CourseStudioView from './components/CourseStudioView';
 import ChapterNav from './components/ChapterNav';
 import TheoryExplorer from './components/TheoryExplorer';
+import {
+  isAuthenticated, getSession, signOut,
+} from './lib/auth';
 import { 
   BookOpen, 
   HelpCircle, 
@@ -29,9 +33,11 @@ import {
   Layers, 
   Upload,
   Compass,
-  Sliders,
+    Sliders,
   Check,
-  FolderOpen
+  FolderOpen,
+  LogOut,
+  User
 } from 'lucide-react';
 
 /** Lightweight markdown renderer for tutor hints (headers, bullets, bold). */
@@ -526,7 +532,36 @@ const BENCHMARK_SCENARIOS = [
 ];
 
 export default function App() {
-  const [showLanding, setShowLanding] = useState(true);
+    // ── Auth-gated view state machine ──────────────────────────────────────
+  // 'landing'  → marketing page
+  // 'auth'     → sign-in / sign-up page
+  // 'dashboard' → the glass-box workspace (only reachable while a valid session exists)
+  const [view, setView] = useState(() => (isAuthenticated() ? 'dashboard' : 'landing'));
+  const [session, setSession] = useState(() => getSession());
+
+  // Require auth before entering the dashboard.  If already signed in we go
+  // straight to the workspace; otherwise the user is sent to the auth screen.
+  const requireDashboard = () => {
+    const current = getSession();
+    if (current) { setSession(current); setView('dashboard'); }
+    else { setView('auth'); }
+  };
+
+  const handleSignOut = () => {
+    signOut();
+    setSession(null);
+    setView('landing');
+  };
+
+  // If we somehow end up on the dashboard without a session (e.g. cookie
+  // expired mid-session), bounce to the landing page.
+  useEffect(() => {
+    if (view === 'dashboard' && !isAuthenticated()) {
+      setSession(null);
+      setView('landing');
+    }
+  }, [view]);
+
   const [activeSubject, setActiveSubject] = useState('Physics');
   const [activeTier, setActiveTier] = useState('Class 10');
   const [activeView, setActiveView] = useState('theory'); 
@@ -738,11 +773,11 @@ export default function App() {
     setActiveTier(tier);
     setActiveCourseTitle(`${subject} (${tier})`);
     loadCurriculum(subject, tier, null);
-  };
+    };
 
   const handleIngestionComplete = (newCourse) => {
     setIsIngestionModalOpen(false);
-    setShowLanding(false);
+    requireDashboard();
     fetchAvailableCourses();
     handleSelectCustomCourse(newCourse);
   };
@@ -1136,22 +1171,22 @@ export default function App() {
 
   const activeColor = getSubjectColor(activeSubject);
 
-  if (showLanding) {
+  if (view === 'landing') {
     return (
       <>
         <LandingPage 
-          onSignUp={() => setShowLanding(false)} 
+          onSignUp={() => setView('auth')} 
           onNavigateSubject={(subject) => {
             handleResetToStandardCourse(subject, activeTier);
-            setShowLanding(false);
+            requireDashboard();
           }}
           onNavigateTier={(tier) => {
             handleResetToStandardCourse(activeSubject, tier);
-            setShowLanding(false);
+            requireDashboard();
           }}
           onStartLearning={(subject, tier) => {
             handleResetToStandardCourse(subject, tier);
-            setShowLanding(false);
+            requireDashboard();
           }}
           onOpenIngestion={() => setIsIngestionModalOpen(true)}
         />
@@ -1161,6 +1196,17 @@ export default function App() {
           onIngestionSuccess={handleIngestionComplete}
         />
       </>
+    );
+  }
+
+  // Auth gate — sign-in / sign-up page.  The dashboard renders only below,
+  // after a valid session has been established.
+  if (view === 'auth') {
+    return (
+      <AuthPage
+        onBack={() => setView('landing')}
+        onAuthenticated={(s) => { setSession(s); setView('dashboard'); }}
+      />
     );
   }
 
@@ -1174,7 +1220,7 @@ export default function App() {
       <header className="w-full glass-panel border-b border-sand-900 px-4 sm:px-8 py-3.5 flex items-center justify-between gap-4 sticky top-0 z-50">
         <div className="flex items-center gap-3 min-w-0">
           <div 
-            onClick={() => setShowLanding(true)}
+            onClick={() => setView('landing')}
             className="bg-gradient-to-tr from-ember-600 to-clay-600 p-2 rounded-xl shadow-lg shadow-sand-300/25 shrink-0 cursor-pointer hover:opacity-90 transition"
             title="Return to Landing Page"
           >
@@ -1253,8 +1299,24 @@ export default function App() {
           </button>
         </div>
 
-        {/* TOP RIGHT CONTROLS */}
+                        {/* TOP RIGHT CONTROLS */}
         <div className="hidden md:flex items-center justify-end gap-3">
+          {/* Signed-in user indicator + sign-out */}
+          {session && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-sand-800 bg-sand-900/60">
+              <User className="w-3.5 h-3.5 text-sand-400" />
+              <span className="text-xs text-sand-300">{session.name || session.username}</span>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="p-1 rounded-lg text-sand-400 hover:text-clay-400 hover:bg-sand-800 transition-colors"
+                aria-label="Sign out"
+                title="Sign out"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
           {customCourses.length > 0 && (
             <select
               value={selectedCourseId || ''}
@@ -1355,8 +1417,19 @@ export default function App() {
               }`}
             >
               <Activity className="w-4 h-4" /> Glass-Box Telemetry
-            </button>
+                        </button>
           </div>
+
+          {session && (
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="w-full flex items-center justify-center gap-2 p-2.5 rounded-xl text-xs font-bold border border-sand-800 bg-sand-900 text-sand-300 hover:text-clay-400 hover:bg-sand-800 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              Sign Out — {session.name || session.username}
+            </button>
+          )}
         </div>
       )}
 

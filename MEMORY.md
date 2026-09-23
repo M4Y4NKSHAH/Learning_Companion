@@ -133,6 +133,9 @@ reports *which cognitive node* is active (Surface / Deep / Direct) — that's th
 - **Financial/cost note:** flashcard generation and hint generation hit the Gemini API;
   throttled by in-memory caching but there is **no persistent user database yet** — state
   is session-only on the frontend.
+- **Authentication gate:** device-local cookie auth (`src/lib/auth.js` + `AuthPage.jsx`) —
+  sign-in/sign-up via `aura_session` + `aura_users` cookies; dashboard is gated behind a
+  valid session (`view` state machine in `App.jsx`). See [DESIGN.md](./DESIGN.md) §4.1.
 
 ---
 

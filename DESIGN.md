@@ -124,6 +124,24 @@ Left rail → central panel → right telemetry:
 - `loading` overlay/spinner, `isGeneratingCards` spinner, `isFlipped` flip state,
   `examReport` full-report view, per-question `lastQuestionEvaluated` feedback.
 - Empty states when `cards/quizzes/finalExams` are empty (buttons disabled).
+
+### Auth-gated view state machine
+`App.jsx` uses a `view` state (`'landing' | 'auth' | 'dashboard'`) backed by
+`src/lib/auth.js`:
+
+- **Initial load:** if a valid `aura_session` cookie exists → `dashboard`;
+  otherwise → `landing`.
+- **Landing → Auth:** any CTA (`Get Started`, `Start Learning`, subject cards)
+  calls `setView('auth')`.
+- **Auth → Dashboard:** `AuthPage.onAuthenticated(session)` writes the session
+  cookie and calls `setView('dashboard')`.
+- **Dashboard guard:** a `useEffect` watches `view === 'dashboard'` and bounces
+  to `landing` if `isAuthenticated()` returns false (cookie expired/tampered).
+- **Sign out:** `handleSignOut()` clears the session cookie + returns to landing.
+
+**Do / Don't:** see §9 — don't expose raw password hashes to the UI (the
+`Aura Auth Page` dev-account list already strips salts/hashes via
+`listLocalAccounts()`).
 ---
 
 ## 5. Animation & Motion Inventory (`src/index.css`)
@@ -163,6 +181,7 @@ Left rail → central panel → right telemetry:
 | Component | File | Purpose |
 | --- | --- | --- |
 | `LandingPage` | `components/LandingPage.jsx` | Marketing + onboarding flow |
+| `AuthPage` | `components/AuthPage.jsx` | Local-cookie sign-in / sign-up gate |
 | `Reveal` | `components/Reveal.jsx` | Scroll-triggered entrance wrapper |
 | `App` | `App.jsx` | Dashboard shell + all workspace views |
 | `HintMarkdown` | `App.jsx` (internal) | Renders `##`, `**bold**`, bullets/numbers from tutor hints |
