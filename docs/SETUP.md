@@ -38,16 +38,12 @@ GEMINI_API_KEY=your_actual_api_key_here
 
 ## 3. Install Backend Dependencies
 
-Activate the virtual environment and install the pinned requirements (also available in
-`packages.txt`):
+Activate the virtual environment and install the requirements from `requirements.txt`:
 
 ```powershell
 .\venv\Scripts\activate
-pip install fastapi uvicorn pydantic python-dotenv langgraph langchain-core langchain-google-genai chromadb
+pip install -r requirements.txt
 ```
-
-> If you prefer the exact pinned set: `pip install -r packages.txt` (after converting the
-> file's `==` lines to a `requirements.txt` if needed).
 
 ---
 
@@ -147,9 +143,9 @@ backend on port 8000.
 ## 9. Useful Maintenance Commands
 
 ```powershell
-# Python dependency freeze (for packages.txt)
+# Python dependency freeze
 .\venv\Scripts\activate
-pip freeze > packages.txt
+pip freeze > requirements-lock.txt
 
 # Build the frontend production bundle
 cd frontend
