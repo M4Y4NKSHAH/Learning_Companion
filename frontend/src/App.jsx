@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import LandingPage from './components/LandingPage';
-import AuthPage from './components/AuthPage';
+import AuthModal from './components/AuthModal';
+import WelcomeBackModal from './components/WelcomeBackModal';
 import MaterialIngestionModal from './components/MaterialIngestionModal';
 import CourseStudioView from './components/CourseStudioView';
 import ChapterNav from './components/ChapterNav';
@@ -540,11 +541,11 @@ export default function App() {
   const [session, setSession] = useState(() => getSession());
 
   // Require auth before entering the dashboard.  If already signed in we go
-  // straight to the workspace; otherwise the user is sent to the auth screen.
+  // straight to the workspace; otherwise the auth popup opens on the landing page.
   const requireDashboard = () => {
     const current = getSession();
     if (current) { setSession(current); setView('dashboard'); }
-    else { setView('auth'); }
+    else { setView('landing'); requestAuth({}); }
   };
 
   const handleSignOut = () => {
@@ -563,6 +564,48 @@ export default function App() {
   }, [view]);
 
   const [activeSubject, setActiveSubject] = useState('Physics');
+
+  // ---- Auth overlay state (popups on the landing page itself) ----
+  // authModalOpen: sign-in/up form popup. welcomeBackOpen: the
+  // already-logged-in animation popup. pendingLandingAction replays any
+  // CTA the user tapped before signing in.
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalInitialMode, setAuthModalInitialMode] = useState('sign-in');
+  const [welcomeBackOpen, setWelcomeBackOpen] = useState(false);
+  const [pendingLandingAction, setPendingLandingAction] = useState(null);
+
+  const requestAuth = (opts) => {
+    opts = opts || {};
+    const initialMode = opts.initialMode || 'sign-in';
+    const action = opts.action || null;
+    if (isAuthenticated()) {
+      setPendingLandingAction(typeof action === 'function' ? action : null);
+      setWelcomeBackOpen(true);
+      return;
+    }
+    setAuthModalInitialMode(initialMode);
+    setPendingLandingAction(typeof action === 'function' ? action : null);
+    setAuthModalOpen(true);
+  };
+
+  const dismissWelcomeBack = () => setWelcomeBackOpen(false);
+
+  const handleModalAuthenticated = (s) => {
+    setSession(s);
+    setAuthModalOpen(false);
+    const pending = pendingLandingAction;
+    setPendingLandingAction(null);
+    if (pending) { pending(); return; }
+    setView('dashboard');
+  };
+
+  const proceedFromWelcomeBack = () => {
+    setWelcomeBackOpen(false);
+    const pending = pendingLandingAction;
+    setPendingLandingAction(null);
+    if (pending) { pending(); return; }
+    setView('dashboard');
+  };
   const [activeTier, setActiveTier] = useState('Class 10');
   const [activeView, setActiveView] = useState('theory'); 
   const [mobileHeaderOpen, setMobileHeaderOpen] = useState(false); 
@@ -1174,19 +1217,32 @@ export default function App() {
   if (view === 'landing') {
     return (
       <>
-        <LandingPage 
-          onSignUp={() => setView('auth')} 
+        <LandingPage
+          onSignUp={() => requestAuth({ initialMode: 'sign-up' })}
+          onSignIn={() => requestAuth({ initialMode: 'sign-in' })}
           onNavigateSubject={(subject) => {
-            handleResetToStandardCourse(subject, activeTier);
-            requireDashboard();
+            requestAuth({
+              action: () => {
+                handleResetToStandardCourse(subject, activeTier);
+                requireDashboard();
+              },
+            });
           }}
           onNavigateTier={(tier) => {
-            handleResetToStandardCourse(activeSubject, tier);
-            requireDashboard();
+            requestAuth({
+              action: () => {
+                handleResetToStandardCourse(activeSubject, tier);
+                requireDashboard();
+              },
+            });
           }}
           onStartLearning={(subject, tier) => {
-            handleResetToStandardCourse(subject, tier);
-            requireDashboard();
+            requestAuth({
+              action: () => {
+                handleResetToStandardCourse(subject, tier);
+                requireDashboard();
+              },
+            });
           }}
           onOpenIngestion={() => setIsIngestionModalOpen(true)}
         />
@@ -1195,19 +1251,27 @@ export default function App() {
           onClose={() => setIsIngestionModalOpen(false)}
           onIngestionSuccess={handleIngestionComplete}
         />
+        <AuthModal
+          isOpen={authModalOpen}
+          initialMode={authModalInitialMode}
+          onClose={() => setAuthModalOpen(false)}
+          onAuthenticated={handleModalAuthenticated}
+        />
+        {welcomeBackOpen && (
+          <WelcomeBackModal
+            user={session}
+            onProceed={proceedFromWelcomeBack}
+          />
+        )}
       </>
     );
   }
 
-  // Auth gate — sign-in / sign-up page.  The dashboard renders only below,
-  // after a valid session has been established.
+  // Legacy auth route - superseded by the AuthModal popup above. Any stale
+  // setView('auth') call lands back on the landing page instead of a blank screen.
   if (view === 'auth') {
-    return (
-      <AuthPage
-        onBack={() => setView('landing')}
-        onAuthenticated={(s) => { setSession(s); setView('dashboard'); }}
-      />
-    );
+    setView('landing');
+    return null;
   }
 
   return (
@@ -2211,3 +2275,4 @@ export default function App() {
     </div>
   );
 }
+
