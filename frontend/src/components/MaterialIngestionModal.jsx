@@ -22,7 +22,7 @@ const TIER_OPTIONS = ['Class 10', 'Class 11-12', 'Undergraduate', 'Graduate', 'P
 export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuccess }) {
   const [activeTab, setActiveTab] = useState('upload'); // 'upload' | 'text'
   const [title, setTitle] = useState('');
-  const [subject, setSubject] = useState('Physics');
+  const [subject, setSubject] = useState('Computer Science');
   const [tier, setTier] = useState('Undergraduate');
   const [rawText, setRawText] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
@@ -30,11 +30,31 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
   // Pipeline status
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStep, setProcessingStep] = useState(0);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [progressPercent, setProgressPercent] = useState(0);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [errorMsg, setErrorMsg] = useState(null);
   const [successCourse, setSuccessCourse] = useState(null);
 
   const fileInputRef = useRef(null);
+  const pollIntervalRef = useRef(null);
+
+  const inferSubject = (text) => {
+    const low = text.toLowerCase();
+    if (low.includes('computer') || low.includes('software') || low.includes('algorithm') || low.includes('data') || low.includes('cs') || low.includes('code') || low.includes('program')) {
+      return 'Computer Science';
+    }
+    if (low.includes('physic') || low.includes('mechanic') || low.includes('thermo')) {
+      return 'Physics';
+    }
+    if (low.includes('math') || low.includes('calculus') || low.includes('algebra')) {
+      return 'Mathematics';
+    }
+    if (low.includes('bio') || low.includes('genetics') || low.includes('cell')) {
+      return 'Biology';
+    }
+    return null;
+  };
 
   useEffect(() => {
     let timer = null;
@@ -46,17 +66,70 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
     } else {
       clearInterval(timer);
     }
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+    };
   }, [isProcessing]);
+
+  const pollJobStatus = (jobId) => {
+    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+
+    pollIntervalRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`http://127.0.0.1:8000/api/material/job/${jobId}/status`);
+        if (!res.ok) return;
+
+        const job = await res.json();
+
+        if (job.status === 'processing' || job.status === 'queued') {
+          if (job.current_step) setProcessingStep(job.current_step);
+          if (job.current_message) setStatusMessage(job.current_message);
+          if (typeof job.progress === 'number') setProgressPercent(job.progress);
+        } else if (job.status === 'completed') {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+          setProcessingStep(5);
+          setProgressPercent(100);
+          setStatusMessage('Course successfully created! Initializing study workspace...');
+          setSuccessCourse(job.course);
+
+          setTimeout(() => {
+            setIsProcessing(false);
+            setProcessingStep(0);
+            setTitle('');
+            setRawText('');
+            setSelectedFile(null);
+            if (onIngestionSuccess) {
+              onIngestionSuccess(job.course);
+            }
+          }, 1200);
+        } else if (job.status === 'failed') {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+          setIsProcessing(false);
+          setProcessingStep(0);
+          setErrorMsg(job.error || 'Ingestion failed during background synthesis.');
+        }
+      } catch (pollErr) {
+        console.warn('Poll warning:', pollErr);
+      }
+    }, 800);
+  };
 
   const handleFileDrop = (e) => {
     e.preventDefault();
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
       setSelectedFile(file);
+      const cleanName = file.name.replace(/\.[^/.]+$/, '');
       if (!title) {
-        setTitle(file.name.replace(/\.[^/.]+$/, ''));
+        setTitle(cleanName);
       }
+      const autoSubj = inferSubject(cleanName);
+      if (autoSubj) setSubject(autoSubj);
     }
   };
 
@@ -64,9 +137,12 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setSelectedFile(file);
+      const cleanName = file.name.replace(/\.[^/.]+$/, '');
       if (!title) {
-        setTitle(file.name.replace(/\.[^/.]+$/, ''));
+        setTitle(cleanName);
       }
+      const autoSubj = inferSubject(cleanName);
+      if (autoSubj) setSubject(autoSubj);
     }
   };
 
@@ -91,13 +167,10 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
 
     setIsProcessing(true);
     setProcessingStep(1);
+    setProgressPercent(15);
+    setStatusMessage('Extracting pages & parsing text stream...');
 
     try {
-      // Smooth advance across visual steps
-      const stepTimer1 = setTimeout(() => setProcessingStep(2), 1200);
-      const stepTimer2 = setTimeout(() => setProcessingStep(3), 3200);
-      const stepTimer3 = setTimeout(() => setProcessingStep(4), 5800);
-
       let response;
       if (activeTab === 'upload') {
         const formData = new FormData();
@@ -105,6 +178,7 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
         formData.append('title', title);
         formData.append('subject', subject);
         formData.append('academic_tier', tier);
+        formData.append('async_mode', 'true');
 
         response = await fetch('http://127.0.0.1:8000/api/material/upload', {
           method: 'POST',
@@ -119,14 +193,11 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
             subject,
             academic_tier: tier,
             raw_text: rawText,
+            async_mode: true,
             generate_questions_immediately: true,
           }),
         });
       }
-
-      clearTimeout(stepTimer1);
-      clearTimeout(stepTimer2);
-      clearTimeout(stepTimer3);
 
       if (!response.ok) {
         let errMessage = `Server error (${response.status})`;
@@ -140,19 +211,29 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
       }
 
       const data = await response.json();
-      setProcessingStep(5);
-      setSuccessCourse(data.course);
 
-      setTimeout(() => {
-        setIsProcessing(false);
-        setProcessingStep(0);
-        setTitle('');
-        setRawText('');
-        setSelectedFile(null);
-        if (onIngestionSuccess) {
-          onIngestionSuccess(data.course);
-        }
-      }, 1000);
+      if (data.job_id) {
+        // Asynchronous background job queued
+        setStatusMessage(data.message || 'Synthesizing instructional curriculum...');
+        pollJobStatus(data.job_id);
+      } else if (data.course) {
+        // Direct synchronous completion fallback
+        setProcessingStep(5);
+        setProgressPercent(100);
+        setStatusMessage('Course generated successfully!');
+        setSuccessCourse(data.course);
+
+        setTimeout(() => {
+          setIsProcessing(false);
+          setProcessingStep(0);
+          setTitle('');
+          setRawText('');
+          setSelectedFile(null);
+          if (onIngestionSuccess) {
+            onIngestionSuccess(data.course);
+          }
+        }, 1000);
+      }
 
     } catch (err) {
       console.error("Ingestion submit error:", err);
@@ -216,18 +297,34 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
                 Decomposing material, synthesizing theory flashcards, vectorizing semantic knowledge, and engineering assessment questions.
               </p>
 
-              {/* Live Elapsed Badge */}
-              <div className="flex items-center gap-2 mb-6 px-3.5 py-1.5 rounded-full bg-sand-950 border border-sand-800 text-[11px] font-mono text-sand-300">
+              {/* Live Elapsed & Real-Time Status Badge */}
+              <div className="flex items-center gap-2 mb-3 px-3.5 py-1.5 rounded-full bg-sand-950 border border-sand-800 text-[11px] font-mono text-sand-300">
                 <Clock className="w-3.5 h-3.5 text-clay-400 animate-pulse" />
                 <span>Elapsed: <strong className="text-sand-50">{elapsedSec}s</strong></span>
                 <span className="text-sand-600">•</span>
-                <span className="text-clay-300">
-                  {processingStep === 1 && "Parsing PDF stream..."}
-                  {processingStep === 2 && "Analyzing outline..."}
-                  {processingStep === 3 && "Synthesizing AI cards..."}
-                  {processingStep === 4 && "Vectorizing embeddings & tests..."}
-                  {processingStep >= 5 && "Completed!"}
+                <span className="text-clay-300 truncate max-w-xs">
+                  {statusMessage || (
+                    processingStep === 1 ? "Parsing document stream..." :
+                    processingStep === 2 ? "Structuring chapter outlines..." :
+                    processingStep === 3 ? "Synthesizing AI theory & flashcards..." :
+                    processingStep === 4 ? "Vectorizing semantic embeddings..." :
+                    "Curriculum completed!"
+                  )}
                 </span>
+              </div>
+
+              {/* Live Progress Bar */}
+              <div className="w-full max-w-md mb-5">
+                <div className="flex justify-between items-center text-[10px] font-mono text-sand-400 mb-1 px-1">
+                  <span>Pipeline Progress</span>
+                  <span className="font-bold text-clay-400">{progressPercent || (processingStep * 20)}%</span>
+                </div>
+                <div className="w-full bg-sand-950 rounded-full h-2 overflow-hidden border border-sand-800/80">
+                  <div 
+                    className="h-full bg-gradient-to-r from-clay-500 to-ember-500 rounded-full transition-all duration-500" 
+                    style={{ width: `${Math.min(100, Math.max(8, progressPercent || (processingStep * 20)))}%` }}
+                  />
+                </div>
               </div>
 
               <div className="w-full max-w-md space-y-2.5 text-left mb-4">

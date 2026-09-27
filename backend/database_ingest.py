@@ -1,18 +1,54 @@
 import os
+import math
+from collections import Counter
 import chromadb
 from chromadb.utils import embedding_functions
 
-import os
-import chromadb
-from chromadb.utils import embedding_functions
+
+class SimpleBM25:
+    """Lightweight zero-dependency BM25Okapi implementation for hybrid search ranking."""
+    def __init__(self, corpus: list[str], k1: float = 1.5, b: float = 0.75):
+        self.k1 = k1
+        self.b = b
+        self.corpus = corpus
+        self.doc_lens = [len(doc.lower().split()) for doc in corpus]
+        self.avgdl = sum(self.doc_lens) / max(1, len(corpus))
+        self.doc_freqs: list[Counter] = [Counter(doc.lower().split()) for doc in corpus]
+        self.idf: dict[str, float] = {}
+        self._init_idf()
+
+    def _init_idf(self):
+        df = Counter()
+        for freq in self.doc_freqs:
+            for term in freq:
+                df[term] += 1
+        n_docs = len(self.corpus)
+        for term, freq in df.items():
+            self.idf[term] = math.log(((n_docs - freq + 0.5) / (freq + 0.5)) + 1.0)
+
+    def get_scores(self, query: str) -> list[float]:
+        q_tokens = query.lower().split()
+        scores = []
+        for idx, freq in enumerate(self.doc_freqs):
+            score = 0.0
+            doc_len = self.doc_lens[idx]
+            len_norm = 1.0 - self.b + self.b * (doc_len / max(1e-4, self.avgdl))
+            for token in q_tokens:
+                if token in freq:
+                    t_idf = self.idf.get(token, 0.0)
+                    tf = freq[token]
+                    score += t_idf * (tf * (self.k1 + 1.0)) / (tf + self.k1 * len_norm)
+            scores.append(score)
+        return scores
+
 
 class DatabaseIngestPipeline:
     def __init__(self, db_path: str = None):
         """Initializes the local persistent vector database storage engine on disk."""
         if db_path is None:
-            # Resolve db_path to the root workspace folder chroma_knowledge_base
-            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            db_path = os.path.join(base_dir, "chroma_knowledge_base")
+            # Resolve db_path to the current directory's chroma_knowledge_base
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            db_path = os.path.join(current_dir, "chroma_knowledge_base")
         
         self.client = chromadb.PersistentClient(path=db_path)
         self.embedding_function = embedding_functions.DefaultEmbeddingFunction()
@@ -65,12 +101,15 @@ class DatabaseIngestPipeline:
             batch_docs = paragraphs[start_idx:end_idx]
             batch_metadatas = all_metadatas[start_idx:end_idx]
             
-            self.curriculum_collection.add(
-                ids=batch_ids, 
-                documents=batch_docs, 
-                metadatas=batch_metadatas
-            )
-            print(f"   Processed segment range [{start_idx} to {min(end_idx, total_chunks)}] successfully...")
+            try:
+                self.curriculum_collection.upsert(
+                    ids=batch_ids, 
+                    documents=batch_docs, 
+                    metadatas=batch_metadatas
+                )
+                print(f"   Processed segment range [{start_idx} to {min(end_idx, total_chunks)}] successfully...")
+            except Exception as e:
+                print(f"[ChromaDB] Batch upsert warning: {e}")
 
         print(f"[OK] Successfully vectorized and loaded all {total_chunks} paragraphs from {subject} ({academic_tier}) into ChromaDB.")
 
@@ -82,10 +121,12 @@ class DatabaseIngestPipeline:
         academic_tier: str = "Custom",
         chapter_id: str = "ch_1",
         chapter_index: int = 1,
+        chapter_title: str = "",
     ):
         """
         Ingests dynamically parsed chunks with SHA-256 content deduplication to prevent vector DB bloat.
         Uses deterministic content hashing to prevent duplicate vector caching.
+        Attaches chapter_id and chapter_title metadata to isolate context and prevent chapter crosstalk.
         """
         import hashlib
         if not chunks:
@@ -115,6 +156,7 @@ class DatabaseIngestPipeline:
                 "course_id": course_id,
                 "chapter_id": chapter_id,
                 "chapter_index": chapter_index,
+                "chapter_title": chapter_title or f"Chapter {chapter_index}",
                 "subject": subject,
                 "academic_tier": academic_tier,
                 "content_hash": chunk_hash,
@@ -173,6 +215,55 @@ class DatabaseIngestPipeline:
             print(f"[ChromaDB] Query error: {e}")
             return []
 
+    def query_chapter_context(self, query: str, course_id: str, chapter_id: str, n_results: int = 4) -> list[str]:
+        """Queries ChromaDB specifically isolated to a course and chapter to eliminate cross-chapter content mixing."""
+        try:
+            results = self.curriculum_collection.query(
+                query_texts=[query],
+                n_results=n_results,
+                where={"$and": [
+                    {"course_id": course_id},
+                    {"chapter_id": chapter_id},
+                    {"data_integrity_status": "verified"}
+                ]}
+            )
+            return results['documents'][0] if results and results.get('documents') and len(results['documents']) > 0 else []
+        except Exception as e:
+            print(f"[ChromaDB] Chapter-specific query error: {e}")
+            return self.query_verified_context(query, course_id=course_id, n_results=n_results)
+
+    def query_hybrid(self, query: str, course_id: str = None, chapter_id: str = None, n_results: int = 4) -> list[str]:
+        """
+        Executes hybrid search fusing dense semantic vector similarity with sparse BM25 keyword matching
+        using Reciprocal Rank Fusion (RRF). Prioritizes exact formula and variable matches.
+        """
+        candidates = []
+        if course_id and chapter_id:
+            candidates = self.query_chapter_context(query, course_id, chapter_id, n_results=n_results * 2)
+        elif course_id:
+            candidates = self.query_verified_context(query, course_id=course_id, n_results=n_results * 2)
+        else:
+            candidates = self.query_verified_context(query, n_results=n_results * 2)
+
+        if not candidates or len(candidates) <= 1:
+            return candidates
+
+        # Run BM25 keyword ranking
+        bm25 = SimpleBM25(candidates)
+        bm25_scores = bm25.get_scores(query)
+        bm25_ranked = sorted(range(len(candidates)), key=lambda i: bm25_scores[i], reverse=True)
+
+        # Reciprocal Rank Fusion (k=60)
+        rrf_scores = [0.0] * len(candidates)
+        for dense_rank, _ in enumerate(candidates):
+            rrf_scores[dense_rank] += 1.0 / (60.0 + dense_rank + 1)
+        for bm25_rank, doc_idx in enumerate(bm25_ranked):
+            rrf_scores[doc_idx] += 1.0 / (60.0 + bm25_rank + 1)
+
+        fused_indices = sorted(range(len(candidates)), key=lambda i: rrf_scores[i], reverse=True)
+        return [candidates[i] for i in fused_indices[:n_results]]
+
+
 
     def preview_interaction_metrics(self, csv_path: str):
         """Validates that your backend Performance Analyzer can cleanly parse your shrunken EdNet sample."""
@@ -188,6 +279,17 @@ class DatabaseIngestPipeline:
                 if idx >= 3: 
                     break
                 print(f"   [Row {idx+1}] User ID: {row.get('user_id') or row.get('student_id')} | Action: {row.get('action_type') or 'QA'} | Latency: {row.get('elapsed_time')}ms")
+
+
+_default_pipeline = None
+
+def get_db_pipeline(db_path: str = None) -> DatabaseIngestPipeline:
+    """Returns a process-wide singleton DatabaseIngestPipeline instance."""
+    global _default_pipeline
+    if _default_pipeline is None:
+        _default_pipeline = DatabaseIngestPipeline(db_path=db_path)
+    return _default_pipeline
+
 
 if __name__ == "__main__":
     pipeline = DatabaseIngestPipeline()

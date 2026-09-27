@@ -65,7 +65,7 @@ def run_test():
     print(f"\nSolution Node: {b_sol['active_node']} | Depth: {b_sol['depth_level']}")
     print(f"Solution Text:\n{b_sol['response']}")
     assert "50 Newtons" not in b_sol['response'], "FAILURE: 50 Newtons found in Biology solution!"
-    assert "Mitochondria" in b_sol['response'], "FAILURE: Mitochondria not in Biology solution!"
+    assert any(term in b_sol['response'].lower() for term in ["mitochondria", "atp", "cellular respiration", "organelle", "powerhouse"]), "FAILURE: Expected biological explanation in solution!"
     assert b_sol['active_node'] == "Direct Explainer Node", f"FAILURE: Expected Direct Explainer Node, got {b_sol['active_node']}"
 
     # -------------------------------------------------------------

@@ -57,35 +57,67 @@ class CourseManager:
 
     @staticmethod
     def list_all_courses() -> List[Dict[str, Any]]:
-        """Lists all courses (built-in + ingested user courses)."""
+        """Lists all courses (built-in + ingested user courses), deduplicating any duplicate custom titles."""
         courses = CourseManager.get_builtin_courses()
         
-        # Load user-created courses from COURSES_DIR
-        for filename in os.listdir(COURSES_DIR):
-            if filename.endswith(".json"):
-                filepath = os.path.join(COURSES_DIR, filename)
-                try:
-                    with open(filepath, "r", encoding="utf-8") as f:
-                        data = json.load(f)
+        # Load user-created courses from COURSES_DIR, sorting by newest first
+        custom_files = [f for f in os.listdir(COURSES_DIR) if f.endswith(".json")]
+        custom_files.sort(key=lambda f: os.path.getmtime(os.path.join(COURSES_DIR, f)), reverse=True)
+
+        seen_titles = set()
+        for filename in custom_files:
+            filepath = os.path.join(COURSES_DIR, filename)
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    norm_t = data.get("title", "").strip().lower()
+                    if norm_t and norm_t not in seen_titles:
+                        seen_titles.add(norm_t)
                         courses.append(data)
-                except Exception as e:
-                    print(f"Error loading course {filename}: {e}")
+            except Exception as e:
+                print(f"Error loading course {filename}: {e}")
                     
         return courses
 
     @staticmethod
-    def get_course_by_id(course_id: str) -> Optional[Dict[str, Any]]:
-        """Fetches a specific course by its unique ID."""
+    def find_course_by_title(title: str) -> Optional[Dict[str, Any]]:
+        """Searches for an existing course by title (case-insensitive)."""
+        clean = title.strip().lower()
         for c in CourseManager.list_all_courses():
-            if c.get("course_id") == course_id:
+            if c.get("title", "").strip().lower() == clean:
                 return c
         return None
 
     @staticmethod
+    def get_course_by_id(course_id: str) -> Optional[Dict[str, Any]]:
+        """Fetches a specific course by its unique ID with direct disk lookup for custom courses."""
+        # 1. Direct lookup for custom courses
+        custom_path = os.path.join(COURSES_DIR, f"{course_id}.json")
+        if os.path.exists(custom_path):
+            try:
+                with open(custom_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"[CourseManager] Error reading {custom_path}: {e}")
+
+        # 2. Check built-in courses
+        for c in CourseManager.get_builtin_courses():
+            if c.get("course_id") == course_id:
+                return c
+
+        return None
+
+    @staticmethod
     def save_custom_course(course_data: Dict[str, Any]) -> str:
-        """Saves a custom ingested course to disk."""
+        """Saves a custom ingested course to disk, overwriting existing version if matching title exists."""
         if not course_data.get("course_id"):
-            course_data["course_id"] = f"custom_{uuid.uuid4().hex[:8]}"
+            # Check if matching custom course exists by title
+            existing = CourseManager.find_course_by_title(course_data.get("title", ""))
+            if existing and not existing.get("is_builtin", False):
+                course_data["course_id"] = existing["course_id"]
+            else:
+                subj = course_data.get("subject", "gen").lower()[:3]
+                course_data["course_id"] = f"custom_{subj}_{uuid.uuid4().hex[:6]}"
             
         course_data["is_builtin"] = False
         course_id = course_data["course_id"]
@@ -104,3 +136,29 @@ class CourseManager:
             os.remove(filepath)
             return True
         return False
+
+    @staticmethod
+    def cleanup_duplicate_courses() -> int:
+        """Removes older duplicate custom course files, preserving the latest file for each title."""
+        custom_files = [f for f in os.listdir(COURSES_DIR) if f.endswith(".json")]
+        custom_files.sort(key=lambda f: os.path.getmtime(os.path.join(COURSES_DIR, f)), reverse=True)
+
+        seen_titles = set()
+        removed_count = 0
+        for filename in custom_files:
+            filepath = os.path.join(COURSES_DIR, filename)
+            try:
+                norm_t = None
+                with open(filepath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    norm_t = data.get("title", "").strip().lower()
+                if norm_t and norm_t in seen_titles:
+                    os.remove(filepath)
+                    removed_count += 1
+                elif norm_t:
+                    seen_titles.add(norm_t)
+            except Exception as ex:
+                print(f"[Cleanup] Error processing {filename}: {ex}")
+                continue
+        return removed_count
+

@@ -1,29 +1,48 @@
 import os
+import sys
 import json
 import uuid
 from typing import Optional, List
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+
+# Ensure current backend directory is in sys.path for robust module resolution
+backend_dir = os.path.dirname(os.path.abspath(__file__))
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
+
+# Load the .env file from current directory first, fallback to parent directory
+local_env = os.path.join(backend_dir, ".env")
+if os.path.exists(local_env):
+    load_dotenv(dotenv_path=local_env)
+else:
+    load_dotenv()
+
+import difflib
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
-
-# Load the .env file automatically
-load_dotenv()
 
 from fuzzy_engine import FuzzyMarkingSystem
 from analytics import PathPerformanceAnalytics
 from theory_repo import FLASHCARD_REPOSITORY
 from tutor_graph import compiled_tutor_app
 from flashcard_builder import build_flashcards_from_chroma, generate_gemini_flashcards_from_chroma, _gemini_flashcard_cache
-from hint_utils import sanitize_gap_analysis, sanitize_hint_text, HINT_FORMAT_DIRECTIVE
+from hint_utils import sanitize_gap_analysis, sanitize_hint_text, HINT_FORMAT_DIRECTIVE, compute_semantic_similarity
+from spaced_repetition import SpacedRepetitionManager
 from material_parser import MaterialParser
 from course_manager import CourseManager
 from question_generator import QuestionGeneratorEngine
-from database_ingest import DatabaseIngestPipeline
+from database_ingest import DatabaseIngestPipeline, get_db_pipeline
+from pedagogical_guardrails import filter_for_grade_level, normalize_academic_tier
+from local_llm_service import local_llm
 
 app = FastAPI(title="Unified Agentic Socratic Tutoring Platform")
+
+# Background job tracker for non-blocking asynchronous course ingestion
+INGESTION_JOBS: dict[str, dict] = {}
 
 app.add_middleware(
     CORSMiddleware,
@@ -40,6 +59,7 @@ class IngestMaterialPayload(BaseModel):
     academic_tier: str = "Standard"
     raw_text: str = ""
     generate_questions_immediately: bool = True
+    async_mode: bool = False
 
 class ChatSessionPayload(BaseModel):
     message: str
@@ -48,9 +68,11 @@ class ChatSessionPayload(BaseModel):
     current_tier: str
     current_subject: str
     course_id: Optional[str] = None
+    chapter_id: Optional[str] = None
     history: list[dict] = []
     current_question: dict = {}
     inquiry_type: str = "discussion"
+    hint_level: int = 1
 
 
 class ShortAnswerPayload(BaseModel):
@@ -62,9 +84,20 @@ class ShortAnswerPayload(BaseModel):
     current_tier: str
     current_subject: str
     course_id: Optional[str] = None
+    chapter_id: Optional[str] = None
+    student_id: Optional[str] = "default_student"
     hint_formula: str = ""
     hint_misconception: str = ""
     hints_requested: int = 0
+    hint_level: int = 1
+
+class SRSReviewPayload(BaseModel):
+    student_id: str
+    card_id: str
+    quality: int
+    course_id: Optional[str] = None
+    chapter_id: Optional[str] = None
+    card_data: Optional[dict] = None
 
 class ExamSubmissionPayload(BaseModel):
     correct_answers: int = 0
@@ -73,6 +106,7 @@ class ExamSubmissionPayload(BaseModel):
     current_tier: str
     current_subject: str
     course_id: Optional[str] = None
+    student_id: Optional[str] = "default_student"
     mock_chat_history: list[dict] = []
     question_details: list[dict] = []
 
@@ -101,155 +135,153 @@ def execute_rag_vector_lookup(subject: str, tier: str, query: str) -> list[str]:
         return [f"Core textbook reference material for {tier} level structural {subject} parameters."]
 
 # --- MATERIAL INGESTION & PIPELINE HELPER ---
+def _find_best_matching_chapter(target_title: str, raw_chapters: list[dict]) -> dict:
+    """Finds the raw detected chapter whose title or content best correlates with the guided title."""
+    if not raw_chapters:
+        return {}
+    target_clean = re.sub(r"^(?:Chapter|Unit|Module|Section)\s+\d+[:\s\-\.]*", "", target_title, flags=re.IGNORECASE).strip().lower()
+    best_match = None
+    best_score = -1.0
+    for ch in raw_chapters:
+        ch_title = ch.get("title", "")
+        ch_clean = re.sub(r"^(?:Chapter|Unit|Module|Section)\s+\d+[:\s\-\.]*", "", ch_title, flags=re.IGNORECASE).strip().lower()
+        score = difflib.SequenceMatcher(None, target_clean, ch_clean).ratio()
+        if score > best_score:
+            best_score = score
+            best_match = ch
+    return best_match if best_match else raw_chapters[0]
+
+
+# --- MATERIAL INGESTION & PIPELINE HELPER ---
 def process_and_ingest_material(
     title: str,
     subject: str,
     academic_tier: str,
-    raw_text: str
+    raw_text: str,
+    course_id: Optional[str] = None,
+    job_id: Optional[str] = None
 ) -> dict:
     """
     Enterprise Ingestion Pipeline:
     1. Sanitizes input material.
-    2. Decomposes document into structured chapters/topics.
+    2. Decomposes document dynamically into clean, non-overlapping instructional chapters.
     3. Generates high-retention theory summaries and flashcards per chapter.
-    4. Vectors chunks into ChromaDB with course/chapter namespaces.
-    5. Synthesizes formative quizzes and summative final exam questions.
+    4. Vectors chunks into ChromaDB with course_id and chapter_id namespaces.
+    5. Synthesizes content-grounded quizzes and summative final exam questions.
     6. Persists the complete course into local storage.
     """
+    if job_id and job_id in INGESTION_JOBS:
+        INGESTION_JOBS[job_id]["status"] = "processing"
+        INGESTION_JOBS[job_id]["current_step"] = 1
+        INGESTION_JOBS[job_id]["current_message"] = "Parsing and sanitizing document content..."
+        INGESTION_JOBS[job_id]["progress"] = 15
+
     clean_text = MaterialParser.clean_text(raw_text)
     if len(clean_text) < 50:
         raise HTTPException(status_code=400, detail="The provided material is too short to extract a curriculum.")
 
-    # 1. Detect / Decompose into chapters
-    raw_chapters = MaterialParser.detect_outline_or_chapters(clean_text)
+    # Auto-detect domain subject if title or text indicates a specific academic field
+    detected_subject = MaterialParser.detect_subject(title, clean_text, fallback=subject)
+    if detected_subject:
+        subject = detected_subject
+
+    # 1. Detect / Decompose into chapters dynamically (unconstrained by book length or page count)
+    raw_chapters = MaterialParser.detect_outline_or_chapters(clean_text, max_chapters=None)
     if not raw_chapters:
         raw_chapters = [{
             "chapter_index": 1,
             "title": f"{title} - Core Fundamentals",
-            "content": clean_text
+            "content": clean_text,
+            "subsections": []
         }]
 
-    course_id = f"custom_{subject.lower()[:3]}_{uuid.uuid4().hex[:6]}"
-    qge = QuestionGeneratorEngine()
-    db_pipeline = DatabaseIngestPipeline()
+    if not course_id:
+        existing = CourseManager.find_course_by_title(title)
+        if existing and not existing.get("is_builtin", False):
+            course_id = existing["course_id"]
+        else:
+            course_id = f"custom_{subject.lower()[:3]}_{uuid.uuid4().hex[:6]}"
 
-    # 1. Single-Pass Guiding Agent Blueprint (Ultra-low token usage: ~350 tokens for entire course)
-    raw_headings = [ch.get("title", "") for ch in raw_chapters]
-    guided_blueprint = qge.generate_guided_curriculum_blueprint(
-        course_title=title,
-        material_sample=clean_text,
-        subject=subject,
-        tier=academic_tier,
-        detected_headings=raw_headings
-    )
+    total_raw = len(raw_chapters)
+    if job_id and job_id in INGESTION_JOBS:
+        INGESTION_JOBS[job_id]["course_id"] = course_id
+        INGESTION_JOBS[job_id]["subject"] = subject
+        INGESTION_JOBS[job_id]["total_chapters"] = total_raw
+        INGESTION_JOBS[job_id]["current_step"] = 2
+        INGESTION_JOBS[job_id]["current_message"] = f"Structured {total_raw} instructional chapters for {subject}. Initializing synthesis..."
+        INGESTION_JOBS[job_id]["progress"] = 25
+
+    qge = QuestionGeneratorEngine()
+    db_pipeline = get_db_pipeline()
 
     processed_chapters = []
     all_cards = []
+    print(f"[Ingestion] Processing {total_raw} detected chapters with strict chapter content isolation...")
 
-    if guided_blueprint and len(guided_blueprint) > 0:
-        print(f"[Ingestion] Applying guiding agent blueprint across {len(guided_blueprint)} chapters...")
-        for idx, g_ch in enumerate(guided_blueprint, 1):
-            ch_id = f"ch_{idx}"
-            ch_title = g_ch.get("title", f"Chapter {idx}")
-            ch_summary = g_ch.get("summary", "")
-            ch_objs = g_ch.get("objectives", [])
-            
-            # Map raw content slice if available
-            ch_content = raw_chapters[idx - 1].get("content", "") if idx - 1 < len(raw_chapters) else clean_text[:4000]
-            
-            # Format flashcards
-            ch_cards = []
-            for c_idx, c in enumerate(g_ch.get("cards", [])):
-                ch_cards.append({
-                    "id": f"c{idx}_{c_idx+1}_{uuid.uuid4().hex[:4]}",
-                    "topic": c.get("topic", ch_title),
-                    "question": c.get("question", f"Core principle in {ch_title}"),
-                    "answer": c.get("answer", "• Governing theoretical axiom and mechanics.")
-                })
-            all_cards.extend(ch_cards)
+    for idx, ch in enumerate(raw_chapters, 1):
+        ch_idx = ch.get("chapter_index", idx)
+        ch_title = ch.get("title", f"Chapter {ch_idx}")
+        ch_content = ch.get("content", "")
+        ch_id = f"ch_{ch_idx}"
 
-            # Deep theory suite from guiding agent
-            deep_theory = {
-                "principles": g_ch.get("principles", [{"title": "Primary Law", "content": ch_summary, "tag": "Core Axiom"}]),
-                "formulations": g_ch.get("formulations", [{"title": "Mathematical Model", "formula": f"Governing model for {ch_title}", "derivation": "Derived from foundational conservation laws.", "variables": "State properties and constants."}]),
-                "mental_models": g_ch.get("mental_models", [{"concept": "Intuitive Model", "analogy": f"System dynamic representing {ch_title}.", "takeaway": "Focus on state invariants."}]),
-                "applications": g_ch.get("applications", [{"domain": f"Applied {subject}", "description": f"Deploys theoretical principles of {ch_title}."}]),
-                "misconceptions": g_ch.get("misconceptions", [{"trap": "Formula misapplication", "correction": "Verify operational assumptions prior to calculation."}])
-            }
+        if job_id and job_id in INGESTION_JOBS:
+            INGESTION_JOBS[job_id]["current_step"] = 3
+            INGESTION_JOBS[job_id]["current_message"] = f"Synthesizing Chapter {idx} of {total_raw}: {ch_title[:32]}..."
+            INGESTION_JOBS[job_id]["progress"] = int(25 + ((idx - 0.5) / max(1, total_raw)) * 40)
 
-            # Vectorize chunks into ChromaDB with SHA-256 deduplication
-            chunks = MaterialParser.create_semantic_chunks(ch_content[:8000], chunk_size=400, overlap=40)[:15]
-            try:
-                db_pipeline.ingest_custom_chunks(
-                    course_id=course_id,
-                    chunks=chunks,
-                    subject=subject,
-                    academic_tier=academic_tier,
-                    chapter_id=ch_id,
-                    chapter_index=idx
-                )
-            except Exception as ve:
-                print(f"[ChromaDB] Vector ingestion warning: {ve}")
+        # Synthesize chapter theory, objectives, and cards directly from this chapter's text
+        theory_data = qge.generate_chapter_theory_and_cards(
+            chapter_title=ch_title,
+            chapter_text=ch_content[:3500],
+            subject=subject,
+            tier=academic_tier,
+            chapter_index=ch_idx
+        )
 
-            processed_chapters.append({
-                "chapter_id": ch_id,
-                "chapter_index": idx,
-                "title": ch_title,
-                "summary": ch_summary,
-                "objectives": ch_objs,
-                "cards": ch_cards,
-                "deep_theory": deep_theory,
-                "full_text": ch_content,
-                "content_preview": ch_content[:400] + "..." if len(ch_content) > 400 else ch_content
-            })
-    else:
-        # Fallback: Local offline extraction
-        if len(raw_chapters) > 8:
-            raw_chapters = raw_chapters[:8]
+        ch_cards = theory_data.get("cards", [])
+        all_cards.extend(ch_cards)
 
-        for ch in raw_chapters:
-            ch_idx = ch.get("chapter_index", len(processed_chapters) + 1)
-            ch_title = ch.get("title", f"Chapter {ch_idx}")
-            ch_content = ch.get("content", "")
-            ch_id = f"ch_{ch_idx}"
+        if job_id and job_id in INGESTION_JOBS:
+            INGESTION_JOBS[job_id]["current_step"] = 4
+            INGESTION_JOBS[job_id]["current_message"] = f"Vectorizing knowledge chunks for Chapter {idx}..."
 
-            theory_data = qge.generate_chapter_theory_and_cards(
-                chapter_title=ch_title,
-                chapter_text=ch_content[:3000],
+        # Vectorize chunks into ChromaDB with strict chapter_id and chapter_title isolation
+        chunks = MaterialParser.create_semantic_chunks(ch_content[:8000], chunk_size=400, overlap=40)[:15]
+        try:
+            db_pipeline.ingest_custom_chunks(
+                course_id=course_id,
+                chunks=chunks,
                 subject=subject,
-                tier=academic_tier,
-                chapter_index=ch_idx
+                academic_tier=academic_tier,
+                chapter_id=ch_id,
+                chapter_index=ch_idx,
+                chapter_title=ch_title
             )
+        except Exception as ve:
+            print(f"[ChromaDB] Vector ingestion warning: {ve}")
 
-            ch_cards = theory_data.get("cards", [])
-            all_cards.extend(ch_cards)
+        processed_chapters.append({
+            "chapter_id": ch_id,
+            "chapter_index": ch_idx,
+            "title": ch_title,
+            "summary": theory_data.get("summary", ""),
+            "objectives": theory_data.get("objectives", []),
+            "cards": ch_cards,
+            "deep_theory": theory_data.get("deep_theory", {}),
+            "subsections": ch.get("subsections", []),
+            "full_text": ch_content,
+            "content_preview": ch_content[:400] + "..." if len(ch_content) > 400 else ch_content
+        })
 
-            chunks = MaterialParser.create_semantic_chunks(ch_content[:8000], chunk_size=400, overlap=40)[:15]
-            try:
-                db_pipeline.ingest_custom_chunks(
-                    course_id=course_id,
-                    chunks=chunks,
-                    subject=subject,
-                    academic_tier=academic_tier,
-                    chapter_id=ch_id,
-                    chapter_index=ch_idx
-                )
-            except Exception as ve:
-                print(f"[ChromaDB] Vector ingestion warning: {ve}")
+        if job_id and job_id in INGESTION_JOBS:
+            INGESTION_JOBS[job_id]["progress"] = int(25 + (idx / max(1, total_raw)) * 45)
 
-            processed_chapters.append({
-                "chapter_id": ch_id,
-                "chapter_index": ch_idx,
-                "title": ch_title,
-                "summary": theory_data.get("summary", ""),
-                "objectives": theory_data.get("objectives", []),
-                "cards": ch_cards,
-                "deep_theory": theory_data.get("deep_theory", {}),
-                "full_text": ch_content,
-                "content_preview": ch_content[:400] + "..." if len(ch_content) > 400 else ch_content
-            })
+    # 3. Generate Content-Aware Assessment Items
+    if job_id and job_id in INGESTION_JOBS:
+        INGESTION_JOBS[job_id]["current_step"] = 5
+        INGESTION_JOBS[job_id]["current_message"] = "Synthesizing chapter quizzes & summative final exam..."
+        INGESTION_JOBS[job_id]["progress"] = 85
 
-    # 3. Generate Assessment Items (Practice Quizzes + Threshold Final Exam)
     assessment = qge.generate_assessment_items(
         course_title=title,
         chapters=processed_chapters,
@@ -279,20 +311,91 @@ def process_and_ingest_material(
     }
 
     CourseManager.save_custom_course(course_record)
+
+    if job_id and job_id in INGESTION_JOBS:
+        INGESTION_JOBS[job_id]["status"] = "completed"
+        INGESTION_JOBS[job_id]["current_step"] = 5
+        INGESTION_JOBS[job_id]["current_message"] = "Course generated successfully!"
+        INGESTION_JOBS[job_id]["progress"] = 100
+        INGESTION_JOBS[job_id]["course"] = course_record
+
     return course_record
+
+
+def _async_ingest_worker(
+    job_id: str,
+    title: str,
+    subject: str,
+    academic_tier: str,
+    raw_text: str,
+    course_id: str
+):
+    """Background worker executing dynamic ingestion without blocking web responses."""
+    try:
+        process_and_ingest_material(
+            title=title,
+            subject=subject,
+            academic_tier=academic_tier,
+            raw_text=raw_text,
+            course_id=course_id,
+            job_id=job_id
+        )
+    except Exception as e:
+        print(f"[Async Ingestion Worker] Error processing {title}: {e}")
+        if job_id in INGESTION_JOBS:
+            INGESTION_JOBS[job_id]["status"] = "failed"
+            INGESTION_JOBS[job_id]["error"] = str(e)
 
 
 # --- INGESTION & COURSE REST ENDPOINTS ---
 
 @app.post("/api/material/ingest")
-async def ingest_material_json(payload: IngestMaterialPayload):
-    """API endpoint to ingest raw text, notes, or syllabus JSON."""
+async def ingest_material_json(payload: IngestMaterialPayload, background_tasks: BackgroundTasks):
+    """API endpoint to ingest raw text, notes, or syllabus JSON (supports synchronous and asynchronous modes)."""
     try:
+        clean_title = payload.title.strip()
+        detected_subject = MaterialParser.detect_subject(clean_title, payload.raw_text, fallback=payload.subject or "General")
+        effective_subject = detected_subject or payload.subject or "General"
+
+        existing = CourseManager.find_course_by_title(clean_title)
+        if existing and not existing.get("is_builtin", False):
+            course_id = existing["course_id"]
+        else:
+            course_id = f"custom_{effective_subject.lower()[:3]}_{uuid.uuid4().hex[:6]}"
+
+        if payload.async_mode:
+            job_id = f"job_{uuid.uuid4().hex[:8]}"
+            INGESTION_JOBS[job_id] = {
+                "job_id": job_id,
+                "course_id": course_id,
+                "title": clean_title,
+                "subject": effective_subject,
+                "status": "queued",
+                "progress": 0,
+                "error": None
+            }
+            background_tasks.add_task(
+                _async_ingest_worker,
+                job_id=job_id,
+                title=clean_title,
+                subject=effective_subject,
+                academic_tier=payload.academic_tier,
+                raw_text=payload.raw_text,
+                course_id=course_id
+            )
+            return {
+                "status": "processing",
+                "message": f"Async ingestion started for '{clean_title}'.",
+                "job_id": job_id,
+                "course_id": course_id
+            }
+
         course = process_and_ingest_material(
             title=payload.title,
-            subject=payload.subject,
+            subject=effective_subject,
             academic_tier=payload.academic_tier,
-            raw_text=payload.raw_text
+            raw_text=payload.raw_text,
+            course_id=course_id
         )
         return {
             "status": "success",
@@ -310,24 +413,63 @@ async def upload_material_file(
     file: UploadFile = File(...),
     title: Optional[str] = Form(None),
     subject: Optional[str] = Form("General"),
-    academic_tier: Optional[str] = Form("Standard")
+    academic_tier: Optional[str] = Form("Standard"),
+    async_mode: Optional[bool] = Form(False),
+    background_tasks: BackgroundTasks = BackgroundTasks()
 ):
-    """API endpoint to upload PDF, TXT, or Markdown documents for automated ingestion."""
+    """API endpoint to upload PDF, TXT, or Markdown documents with instant async or sync processing."""
     try:
         contents = await file.read()
         filename = (file.filename or "uploaded_document").lower()
         clean_title = title.strip() if (title and title.strip()) else os.path.splitext(file.filename or "Uploaded Material")[0]
-        
-        if filename.endswith(".pdf"):
-            extracted_text = MaterialParser.extract_text_from_pdf_bytes(contents)
+
+        if filename.endswith((".pdf", ".epub", ".mobi", ".xps", ".fb2")):
+            extracted_text = MaterialParser.extract_text_from_document_bytes(contents, filename=file.filename or "")
         else:
             extracted_text = contents.decode("utf-8", errors="replace")
+
+        detected_subject = MaterialParser.detect_subject(clean_title, extracted_text, fallback=subject or "General")
+        effective_subject = detected_subject or subject or "General"
+
+        existing = CourseManager.find_course_by_title(clean_title)
+        if existing and not existing.get("is_builtin", False):
+            course_id = existing["course_id"]
+        else:
+            course_id = f"custom_{effective_subject.lower()[:3]}_{uuid.uuid4().hex[:6]}"
+
+        if async_mode:
+            job_id = f"job_{uuid.uuid4().hex[:8]}"
+            INGESTION_JOBS[job_id] = {
+                "job_id": job_id,
+                "course_id": course_id,
+                "title": clean_title,
+                "subject": effective_subject,
+                "status": "queued",
+                "progress": 0,
+                "error": None
+            }
+            background_tasks.add_task(
+                _async_ingest_worker,
+                job_id=job_id,
+                title=clean_title,
+                subject=effective_subject,
+                academic_tier=academic_tier or "Standard",
+                raw_text=extracted_text,
+                course_id=course_id
+            )
+            return {
+                "status": "processing",
+                "message": f"Async ingestion job queued for '{file.filename}'.",
+                "job_id": job_id,
+                "course_id": course_id
+            }
             
         course = process_and_ingest_material(
             title=clean_title,
             subject=subject or "General",
             academic_tier=academic_tier or "Standard",
-            raw_text=extracted_text
+            raw_text=extracted_text,
+            course_id=course_id
         )
         return {
             "status": "success",
@@ -340,6 +482,13 @@ async def upload_material_file(
         print(f"File upload error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to process uploaded file: {str(e)}")
 
+@app.get("/api/material/job/{job_id}/status")
+async def get_ingestion_job_status(job_id: str):
+    """Polls real-time progress for async ingestion background jobs."""
+    if job_id not in INGESTION_JOBS:
+        raise HTTPException(status_code=404, detail="Ingestion job not found.")
+    return INGESTION_JOBS[job_id]
+
 @app.get("/api/material/courses")
 async def get_all_courses():
     """Lists all available standard and ingested custom courses."""
@@ -350,6 +499,16 @@ async def get_course_detail(course_id: str):
     """Retrieves full course structure and theory chapters for a specific course ID."""
     course = CourseManager.get_course_by_id(course_id)
     if not course:
+        # Check if this course is currently processing in background
+        for j in INGESTION_JOBS.values():
+            if j.get("course_id") == course_id and j.get("status") in ["queued", "processing"]:
+                return {
+                    "course_id": course_id,
+                    "title": j.get("title"),
+                    "status": "processing",
+                    "progress": j.get("progress", 0),
+                    "chapters": []
+                }
         raise HTTPException(status_code=404, detail=f"Course '{course_id}' not found.")
     return course
 
@@ -462,6 +621,8 @@ async def run_session_cycle(payload: ChatSessionPayload):
         "active_agent_node": "Initialization",
         "subject": payload.current_subject,
         "academic_tier": payload.current_tier,
+        "course_id": payload.course_id or "",
+        "chapter_id": payload.chapter_id or "",
         "current_question": payload.current_question,
         "inquiry_type": payload.inquiry_type
     }
@@ -542,10 +703,24 @@ async def evaluate_short_answer(payload: ShortAnswerPayload):
     gap_analysis = "No specific error analysis available."
     error_severity = 0.0
     try:
-        if not model:
+        diag_res_text = None
+        if model:
+            try:
+                diag_res = model.invoke([HumanMessage(content=diagnostic_prompt)])
+                diag_res_text = diag_res.content
+            except Exception as ge:
+                print(f"[evaluate_short_answer] Gemini diagnostic warning: {ge}")
+
+        if not diag_res_text and local_llm.is_available():
+            try:
+                diag_res_text = local_llm.generate(prompt=diagnostic_prompt, system_prompt="You are a JSON-only grading diagnostic engine.")
+            except Exception as le:
+                print(f"[evaluate_short_answer] Local LLM diagnostic warning: {le}")
+
+        if not diag_res_text:
             raise ValueError("Offline mode: running local deterministic diagnostic engine.")
-        diag_res   = model.invoke([HumanMessage(content=diagnostic_prompt)])
-        clean_json = diag_res.content.replace("```json", "").replace("```", "").strip()
+
+        clean_json = local_llm._clean_json_str(diag_res_text)
         diag_data  = json.loads(clean_json)
         base_accuracy = float(diag_data.get("accuracy_percentage", 0.0))
         is_correct    = bool(diag_data.get("is_logically_correct", False))
@@ -563,15 +738,29 @@ async def evaluate_short_answer(payload: ShortAnswerPayload):
         # Normalize student raw input and expected answer for math & text comparisons
         norm_student = payload.student_raw_input.strip().lower().replace(" ", "").replace("x=", "").replace("ans=", "").replace("answer=", "")
         norm_expected = payload.expected_answer.strip().lower().replace(" ", "").replace("x=", "")
-        is_correct = (norm_student == norm_expected) or (payload.student_raw_input.strip().lower() == payload.expected_answer.strip().lower())
-        base_accuracy = 100.0 if is_correct else 0.0
-        error_severity = 0.0 if is_correct else 0.8
-        gap_analysis  = sanitize_gap_analysis(
-            f"The student wrote '{payload.student_raw_input}', but the approach or result "
-            f"does not yet satisfy the problem requirements. Review the governing relationship "
-            f"for this question type.",
-            payload.expected_answer,
-        )
+        
+        sim = compute_semantic_similarity(payload.student_raw_input, payload.expected_answer)
+        is_correct = (norm_student == norm_expected) or (sim >= 0.70)
+        
+        if is_correct:
+            base_accuracy = max(92.0, round(sim * 100.0, 1))
+            error_severity = max(0.0, round((1.0 - sim) * 0.4, 2))
+            gap_analysis = "Submission matches or semantically captures the required concept."
+        elif sim >= 0.40:
+            base_accuracy = round(sim * 75.0, 1)
+            error_severity = min(0.65, max(0.3, round(1.0 - sim, 2)))
+            gap_analysis = sanitize_gap_analysis(
+                f"The response '{payload.student_raw_input}' is partially aligned but missing core terms or exact derivation.",
+                payload.expected_answer
+            )
+        else:
+            base_accuracy = round(sim * 50.0, 1)
+            error_severity = min(1.0, max(0.6, round(1.0 - sim, 2)))
+            gap_analysis = sanitize_gap_analysis(
+                f"The student wrote '{payload.student_raw_input}', but the result "
+                f"does not satisfy the required theoretical relationship. Review the governing relationship.",
+                payload.expected_answer,
+            )
 
     # ══════════════════════════════════════════════════════════════════════════════
     # STAGE 2 — Multi-Parameter Mamdani Fuzzy Inference
@@ -590,14 +779,16 @@ async def evaluate_short_answer(payload: ShortAnswerPayload):
     degree_of_failure = evaluation["degree_of_failure"]
 
     # ══════════════════════════════════════════════════════════════════════════════
-    # STAGE 3 — Mamdani-Calibrated Gemini Hint
+    # STAGE 3 — Mamdani-Calibrated 3-Level Progressive Hint Ladder
     # ══════════════════════════════════════════════════════════════════════════════
     hint_response = ""
     if not is_correct:
+        hint_lvl = getattr(payload, "hint_level", 1)
         shared_context = (
             f"SUBJECT: {payload.current_subject} | LEVEL: {payload.current_tier}\n"
             f"QUESTION: {payload.question_text}\n"
-            f"STUDENT'S ANSWER: {payload.student_raw_input}\n\n"
+            f"STUDENT'S ANSWER: {payload.student_raw_input}\n"
+            f"REQUESTED HINT LEVEL: Level {hint_lvl} (1=Socratic, 2=Formula Reminder, 3=Worked Setup)\n\n"
             f"MAMDANI FUZZY SYSTEM DIAGNOSIS:\n"
             f"  Performance Tier   : {performance_tier}\n"
             f"  Fuzzy Score        : {fuzzy_score}%\n"
@@ -610,60 +801,77 @@ async def evaluate_short_answer(payload: ShortAnswerPayload):
             f"  {payload.hint_formula or 'derive from question parameters'}\n\n"
         )
 
-        if degree_of_failure >= 60.0 or error_severity >= 0.7:
-            # ── INTERVENTION REQUIRED: Structured conceptual walkthrough ─────
-            hint_prompt = (
-                "You are an academic remediation tutor. The Mamdani Fuzzy System has classified "
-                "this student in the 'Intervention Required' tier — they need structured guidance.\n\n"
-                + shared_context +
-                f"KNOWN MISCONCEPTION PATTERN: {payload.hint_misconception or 'general conceptual gap'}\n\n"
-                "DIRECTIVE:\n"
-                "1. In ONE sentence, confirm exactly what the student got wrong (reference their answer).\n"
-                "2. Explain the governing formula or concept in plain language.\n"
-                "3. Walk through the setup steps (identify variables, choose the right operation) "
-                "   WITHOUT computing or stating the final numerical answer.\n"
-                "4. End with one encouraging prompt for the student to finish the calculation themselves.\n"
-                "STRICT RULE: Never state the final answer, exact result, or completed substitution.\n"
-                "Do NOT be generic. Every sentence must be about THIS student's specific mistake."
-                + HINT_FORMAT_DIRECTIVE
+        if hint_lvl == 1:
+            level_directive = (
+                "HINT LEVEL 1 (SOCRATIC NUDGE):\n"
+                "1. In ONE sentence, point out what physical or conceptual relationship the student considered.\n"
+                "2. Ask ONE guiding Socratic question that prompts them to identify the missing or misapplied condition.\n"
+                "3. Strictly do NOT name the formula or state any numbers."
+            )
+        elif hint_lvl == 2:
+            level_directive = (
+                "HINT LEVEL 2 (FORMULA & PRINCIPLE REMINDER):\n"
+                f"1. Explicitly name the governing formula or principle ({payload.hint_formula or 'core law'}).\n"
+                "2. Describe what each symbol represents in this problem's context.\n"
+                "3. Do NOT substitute numerical values or calculate the result."
             )
         else:
-            # ── DEVELOPING: Targeted Socratic nudge ──────────────────────────
-            hint_prompt = (
-                "You are a Socratic tutoring assistant. The Mamdani Fuzzy System has classified "
-                "this student in the 'Developing' tier — they are close but need a targeted nudge.\n\n"
-                + shared_context +
-                f"KNOWN MISCONCEPTION PATTERN: {payload.hint_misconception or 'general conceptual gap'}\n\n"
-                "DIRECTIVE:\n"
-                "1. In ONE sentence, pinpoint exactly what is wrong in the student's answer "
-                "   (reference their specific words/values).\n"
-                "2. Ask ONE Socratic question that leads them to discover the correct approach "
-                "   without giving away the answer or formula.\n"
-                "3. Optionally add a one-sentence conceptual reminder.\n"
-                "STRICT RULE: Never state the final answer, exact result, or completed substitution.\n"
-                "Do NOT be generic. Every sentence must address THIS student's specific error."
-                + HINT_FORMAT_DIRECTIVE
+            level_directive = (
+                "HINT LEVEL 3 (WORKED INTERMEDIATE SETUP):\n"
+                "1. State the formula and show the substitution of the given parameters into the equation.\n"
+                "2. Stop right before the final algebraic/arithmetic step.\n"
+                "3. Prompt the student to carry out the final calculation step themselves.\n"
+                "4. Strictly NEVER state the final numerical answer."
             )
 
-        try:
-            response      = model.invoke([HumanMessage(content=hint_prompt)])
-            hint_response = sanitize_hint_text(response.content, payload.expected_answer)
-        except Exception as e:
-            print("GEMINI API ERROR IN EVALUATE-SHORT-ANSWER:", e)
-            if degree_of_failure >= 60.0:
+        hint_prompt = (
+            "You are an adaptive Socratic academic tutor.\n\n"
+            + shared_context +
+            f"KNOWN MISCONCEPTION PATTERN: {payload.hint_misconception or 'general conceptual gap'}\n\n"
+            f"{level_directive}\n"
+            "Do NOT be generic. Every sentence must address THIS student's specific submission."
+            + HINT_FORMAT_DIRECTIVE
+        )
+
+        hint_raw_text = None
+        if model:
+            try:
+                response = model.invoke([HumanMessage(content=hint_prompt)])
+                hint_raw_text = response.content
+            except Exception as ge:
+                print(f"[evaluate_short_answer] Gemini hint warning: {ge}")
+
+        if not hint_raw_text and local_llm.is_available():
+            try:
+                hint_raw_text = local_llm.generate(prompt=hint_prompt, system_prompt="You are an adaptive Socratic academic tutor.")
+            except Exception as le:
+                print(f"[evaluate_short_answer] Local LLM hint warning: {le}")
+
+        if hint_raw_text:
+            hint_response = sanitize_hint_text(hint_raw_text, payload.expected_answer)
+        else:
+            if hint_lvl == 1:
                 hint_response = sanitize_hint_text(
-                    "## Concept Review\n"
-                    f"- **Focus:** {gap_analysis}\n"
-                    f"- **Key relationship:** {payload.hint_formula or 'Identify how the given quantities relate.'}\n"
-                    "- **Next step:** Substitute the known values and finish the calculation on your own.",
+                    "## Socratic Nudge\n"
+                    "- What physical relationship or principle connects the quantities given in this problem?\n"
+                    f"- **Common pitfall:** {payload.hint_misconception or 'Carefully check the units and initial conditions.'}\n"
+                    "- What is the primary state variable that governs this behavior?",
+                    payload.expected_answer,
+                )
+            elif hint_lvl == 2:
+                hint_response = sanitize_hint_text(
+                    "## Formula & Principle Reminder\n"
+                    f"- **Governing Concept:** {payload.hint_formula or 'Recall the governing equation for this topic.'}\n"
+                    "- Identify all known parameters given in the problem statement.\n"
+                    "- How can you rearrange this formula to isolate the target unknown?",
                     payload.expected_answer,
                 )
             else:
                 hint_response = sanitize_hint_text(
-                    "## Socratic Nudge\n"
-                    "- You are close — re-check whether you applied the correct operation.\n"
-                    f"- **Common pitfall:** {payload.hint_misconception or 'Double-check calculation order.'}\n"
-                    "- What relationship between the given values might you have overlooked?",
+                    "## Worked Intermediate Setup\n"
+                    f"- **Focus:** {gap_analysis}\n"
+                    f"- **Governing Model:** {payload.hint_formula or 'Standard operational relation'}\n"
+                    "- **Next Step:** Substitute your known numerical values into the equation and carry out the final calculation yourself.",
                     payload.expected_answer,
                 )
     else:
@@ -671,6 +879,27 @@ async def evaluate_short_answer(payload: ShortAnswerPayload):
             f"Correct! {linguistic_remark} "
             f"Fuzzy Mastery Score: {fuzzy_score}% — {performance_tier}."
         )
+
+    # Post-generation pedagogical guardrail: ensure no calculus/Class 12 terms leak into Class 9 hints
+    hint_response = filter_for_grade_level(hint_response, payload.current_tier)
+
+    try:
+        from analytics_db import AnalyticsDatabase
+        AnalyticsDatabase.record_attempt(
+            student_id=getattr(payload, "student_id", "default_student") or "default_student",
+            course_id=payload.course_id or "",
+            chapter_id=getattr(payload, "chapter_id", "ch_1") or "ch_1",
+            question_id=payload.question_text[:40],
+            question_type="short_answer",
+            is_correct=is_correct,
+            accuracy_pct=base_accuracy,
+            fuzzy_score=fuzzy_score,
+            error_severity=error_severity,
+            hint_level=getattr(payload, "hint_level", 1),
+            latency_seconds=float(payload.seconds_spent)
+        )
+    except Exception as ae:
+        print(f"[Analytics] Attempt recording warning: {ae}")
 
     return {
         "is_correct":        is_correct,
@@ -683,6 +912,7 @@ async def evaluate_short_answer(payload: ShortAnswerPayload):
         "error_severity":    error_severity,
         "assigned_hint":     hint_response
     }
+
 
 @app.post("/api/tutor/evaluate-exam")
 async def evaluate_final_exam(payload: ExamSubmissionPayload):
@@ -721,6 +951,13 @@ async def evaluate_final_exam(payload: ExamSubmissionPayload):
     tier_data = subject_repo.get(payload.current_tier, {"finalExam": []})
     exam_questions = {q["qId"]: q for q in tier_data.get("finalExam", [])}
 
+    # Also resolve custom course questions if course_id is present
+    if payload.course_id:
+        custom_course = CourseManager.get_course_by_id(payload.course_id)
+        if custom_course and custom_course.get("finalExam"):
+            for q in custom_course.get("finalExam", []):
+                exam_questions[q["qId"]] = q
+
     correct_details = []
     incorrect_details = []
     
@@ -733,10 +970,10 @@ async def evaluate_final_exam(payload: ExamSubmissionPayload):
             q_fuzzy_score = q_detail.get("fuzzy_score", 0.0)
             
             repo_q = exam_questions.get(q_id, {})
-            topic = repo_q.get("moduleOrigin", "Unknown Topic")
-            q_text = repo_q.get("text", "Unknown Question")
-            formula = repo_q.get("formula", "")
-            misconception = repo_q.get("misconception", "")
+            topic = repo_q.get("moduleOrigin") or q_detail.get("moduleOrigin") or q_detail.get("topic") or "Core Topic"
+            q_text = repo_q.get("text") or q_detail.get("text") or q_detail.get("question") or "Exam Problem"
+            formula = repo_q.get("formula") or q_detail.get("formula") or ""
+            misconception = repo_q.get("misconception") or q_detail.get("misconception") or ""
             
             info = {
                 "qId": q_id,
@@ -896,6 +1133,112 @@ async def evaluate_final_exam(payload: ExamSubmissionPayload):
         "growth_metrics": analytics
     }
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STREAMING TUTOR CHAT (SERVER-SENT EVENTS)
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.post("/api/tutor/chat/stream")
+async def run_session_cycle_stream(payload: ChatSessionPayload):
+    """
+    Server-Sent Events (SSE) streaming endpoint for the adaptive inquiry tutor.
+    Streams tokens in real-time, reducing perceived response latency to ~1s.
+    """
+    async def sse_event_generator():
+        messages_history = []
+        for chat in payload.history[-6:]:
+            if chat.get("sender") in ["user", "student"]:
+                messages_history.append(HumanMessage(content=chat["text"]))
+            else:
+                messages_history.append(AIMessage(content=chat["text"]))
+
+        messages_history.append(HumanMessage(content=payload.message))
+
+        initial_graph_state = {
+            "messages": messages_history,
+            "time_taken_seconds": payload.time_taken,
+            "consecutive_errors": payload.consecutive_errors,
+            "requires_remedial_routing": False,
+            "depth_level": "surface",
+            "retrieved_curriculum": [],
+            "active_agent_node": "Initialization",
+            "subject": payload.current_subject,
+            "academic_tier": payload.current_tier,
+            "course_id": payload.course_id or "",
+            "chapter_id": payload.chapter_id or "",
+            "current_question": payload.current_question,
+            "inquiry_type": payload.inquiry_type
+        }
+
+        try:
+            final_response = ""
+            active_node = "Discussion Node"
+            for event in compiled_tutor_app.stream(initial_graph_state):
+                for node_name, node_output in event.items():
+                    active_node = node_output.get("active_agent_node", node_name)
+                    if "messages" in node_output and node_output["messages"]:
+                        last_m = node_output["messages"][-1]
+                        content = getattr(last_m, "content", "")
+                        if content and content != final_response:
+                            delta = content[len(final_response):] if content.startswith(final_response) else content
+                            final_response = content
+                            yield f"data: {json.dumps({'token': delta, 'active_node': active_node})}\n\n"
+
+            yield f"data: {json.dumps({'done': True, 'response': final_response, 'active_node': active_node})}\n\n"
+        except Exception as e:
+            fallback = f"Let's explore **{payload.message}**. What fundamental principles come to mind?"
+            yield f"data: {json.dumps({'token': fallback, 'done': True, 'active_node': 'Fallback Node'})}\n\n"
+
+    return StreamingResponse(sse_event_generator(), media_type="text/event-stream")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPACED REPETITION (SM-2) ENDPOINTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.post("/api/srs/review")
+async def record_srs_card_review(payload: SRSReviewPayload):
+    """Updates card review interval and repetitions using SuperMemo-2 (SM-2)."""
+    result = SpacedRepetitionManager.record_review(
+        student_id=payload.student_id,
+        card_id=payload.card_id,
+        quality=payload.quality,
+        course_id=payload.course_id,
+        chapter_id=payload.chapter_id,
+        card_data=payload.card_data
+    )
+    return result
+
+@app.get("/api/srs/due/{student_id}")
+async def get_due_srs_cards(student_id: str, course_id: Optional[str] = None):
+    """Retrieves all flashcards scheduled for review on or before today."""
+    due = SpacedRepetitionManager.get_due_cards(student_id, course_id)
+    return {"due_cards": due, "count": len(due)}
+
+@app.get("/api/srs/stats/{student_id}")
+async def get_student_srs_stats(student_id: str):
+    """Calculates student retention stats, learning cards, and mature cards."""
+    return SpacedRepetitionManager.get_student_stats(student_id)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PERSISTENT LEARNING ANALYTICS ENDPOINTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/analytics/heatmap/{student_id}/{course_id}")
+async def get_student_course_heatmap(student_id: str, course_id: str):
+    """Returns per-chapter mastery performance and attempts breakdown."""
+    from analytics_db import AnalyticsDatabase
+    heatmap = AnalyticsDatabase.get_course_mastery_heatmap(student_id, course_id)
+    return {"student_id": student_id, "course_id": course_id, "heatmap": heatmap}
+
+@app.get("/api/analytics/summary/{student_id}")
+async def get_student_trajectory_summary(student_id: str):
+    """Returns overall student learning trajectory, total attempts, and average accuracy."""
+    from analytics_db import AnalyticsDatabase
+    return AnalyticsDatabase.get_student_summary(student_id)
+
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=False)
+    uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=False)

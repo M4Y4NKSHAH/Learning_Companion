@@ -807,6 +807,9 @@ export default function App() {
     setLoading(true);
     const API_BASE = 'http://127.0.0.1:8000';
     try {
+      const activeChapterObj = (activeChapterIndex !== null && chapters[activeChapterIndex]) ? chapters[activeChapterIndex] : null;
+      const currentChapterId = activeChapterObj?.chapter_id || (activeChapterIndex !== null ? `ch_${activeChapterIndex + 1}` : "");
+
       const response = await fetch(`${API_BASE}/api/tutor/evaluate-short-answer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -818,6 +821,8 @@ export default function App() {
           attempts_count: currentAttemptsCount,
           current_tier: activeTier,
           current_subject: activeSubject,
+          course_id: selectedCourseId || "",
+          chapter_id: currentChapterId || "",
           hint_formula: currentTarget.formula || "",
           hint_misconception: currentTarget.misconception || "",
           hints_requested: hintsUsedCount
@@ -1039,6 +1044,9 @@ export default function App() {
     setChatLog(nextHistory);
     if (overrideText === null) setStudentAnswer('');
 
+    const activeChapterObj = (activeChapterIndex !== null && chapters[activeChapterIndex]) ? chapters[activeChapterIndex] : null;
+    const currentChapterId = activeChapterObj?.chapter_id || (activeChapterIndex !== null ? `ch_${activeChapterIndex + 1}` : "");
+
     try {
       const response = await fetch('http://127.0.0.1:8000/api/tutor/chat', {
         method: 'POST',
@@ -1049,6 +1057,8 @@ export default function App() {
           consecutive_errors: mockErrors,
           current_tier: activeTier,
           current_subject: activeSubject,
+          course_id: selectedCourseId || "",
+          chapter_id: currentChapterId || "",
           history: chatLog,
           current_question: currentQuestion,
           inquiry_type: inquiryType
@@ -1485,7 +1495,9 @@ export default function App() {
                                   </span>
                                 )}
                                 <span className={`text-[9px] font-mono px-2.5 py-0.5 rounded-full border ${
-                                  chat.depth === 'deep' 
+                                  chat.depth === 'guardrail_deflection'
+                                    ? 'bg-rose-950/70 border-rose-500/50 text-rose-300 font-semibold shadow-sm'
+                                    : chat.depth === 'deep' 
                                     ? 'bg-clay-950/60 border-clay-500/40 text-clay-300'
                                     : (chat.depth === 'solution' || chat.depth === 'remedial')
                                     ? 'bg-clay-950/60 border-clay-500/40 text-clay-300'
@@ -1493,7 +1505,7 @@ export default function App() {
                                     ? 'bg-amber-500/10 border-amber-500/40 text-amber-800'
                                     : 'bg-olive-950/60 border-olive-500/40 text-olive-300'
                                 }`}>
-                                  {chat.depth === 'deep' ? '🔮 Deep Inquiry' : (chat.depth === 'solution' || chat.depth === 'remedial') ? '⚡ Direct Solution' : chat.depth === 'hint' ? '💡 Socratic Hint' : '🌱 Concept Guide'}
+                                  {chat.depth === 'guardrail_deflection' ? '🎯 Course Guardrail' : chat.depth === 'deep' ? '🔮 Deep Inquiry' : (chat.depth === 'solution' || chat.depth === 'remedial') ? '⚡ Direct Solution' : chat.depth === 'hint' ? '💡 Socratic Hint' : '🌱 Concept Guide'}
                                 </span>
                               </div>
                             )}

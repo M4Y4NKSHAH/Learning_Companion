@@ -24,6 +24,10 @@ backend/data/ednet/ednet_small_sample.csv
 backend/data/dialogue/teacher_student_corpus/*.json
 backend/data/courses/custom_*.json
 
-# System file logs
+# System file logs and local databases
 *.log
+*.db
+*.sqlite3
+*.safetensors
+training/*adapter*/
 .DS_Store

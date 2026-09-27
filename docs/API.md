@@ -93,7 +93,8 @@ subject/tier. Caches result in `_gemini_flashcard_cache[(subject, tier)]`.
 ## 4. `POST /api/tutor/chat`
 
 Runs one turn through the compiled LangGraph tutor. History (last **6** messages) is
-replayed so the tutor has context.
+replayed so the tutor has context. Enforces pedagogical grade ceilings and off-topic guardrails.
+Powered offline by local Ollama (`llama3.2:3b`), with Gemini and rule-based fallbacks.
 
 **Request body** (`ChatSessionPayload`)
 
@@ -104,6 +105,14 @@ replayed so the tutor has context.
   "consecutive_errors": 0,
   "current_tier": "Class 10",
   "current_subject": "Physics",
+  "course_id": "custom_phy_89a12c",     // optional custom course ID
+  "chapter_id": "ch_1",                  // optional active chapter ID
+  "inquiry_type": "discussion",          // discussion | hint | solution
+  "current_question": {                  // optional active quiz context
+    "text": "Calculate force on 5kg mass...",
+    "concept": "Newton's Second Law",
+    "expected_answer": "10 N"
+  },
   "history": [
     { "sender": "user",  "text": "What is Newton's second law?" },   // or "student"
     { "sender": "tutor", "text": "It relates force, mass and acceleration…" } // or "ai"
@@ -116,8 +125,8 @@ replayed so the tutor has context.
 ```jsonc
 {
   "response": "Excellent question! Here's an intuitive map of F = ma…",
-  "active_node": "Deep Inquiry Discussion Node",   // glass-box telemetry
-  "depth_level": "deep",                            // surface | deep | remedial
+  "active_node": "Deep Inquiry Discussion Node",   // Socratic Hint | Surface Discussion | Deep Inquiry | Direct Explainer | Course Guardrail Deflector
+  "depth_level": "deep",                            // surface | deep | remedial | hint | guardrail_deflection
   "remedial_triggered": false,
   "context_pulled": ["…retrieved textbook chunk…", "…"],
   "mamdani_evaluation": {
@@ -129,15 +138,17 @@ replayed so the tutor has context.
 }
 ```
 
-> Fallback if the graph throws: `active_node = "Discussion Node"`,
-> `depth_level = "surface"`, `mamdani_evaluation.fuzzy_score = 60.0`.
+> **Off-Topic Deflection:** If the query violates academic guardrails (e.g. gaming, entertainment),
+> the graph routes immediately to `active_node = "Course Guardrail Deflector"`,
+> `depth_level = "guardrail_deflection"`, with zero LLM token consumption.
+
 ---
 
 ## 5. `POST /api/tutor/evaluate-short-answer`
 
-3-stage pipeline: Gemini diagnostic grader → Mamdani fuzzy scoring → adaptive hint
-(Intervention walkthrough **or** Developing Socratic nudge), with answer-leak
-sanitization applied before returning.
+3-stage pipeline: Diagnostic grader (local Ollama or Gemini) → Mamdani fuzzy scoring → 3-level adaptive hint
+ladder (Socratic Nudge → Formula Reminder → Worked Setup), with answer-leak sanitization and
+grade-level ceiling filtering applied before returning.
 
 **Request body** (`ShortAnswerPayload`)
 
@@ -150,8 +161,12 @@ sanitization applied before returning.
   "attempts_count": 1,
   "current_tier": "Class 10",
   "current_subject": "Physics",
+  "course_id": "custom_phy_89a12c",  // optional custom course ID
+  "chapter_id": "ch_1",               // optional active chapter ID
   "hint_formula": "Force = Mass x Acceleration (F = m x a)",
-  "hint_misconception": "Student might be dividing the variables…"
+  "hint_misconception": "Student might be dividing the variables…",
+  "hints_requested": 0,
+  "hint_level": 1                    // 1 = Socratic Nudge, 2 = Formula Reminder, 3 = Worked Setup
 }
 ```
 
@@ -159,8 +174,9 @@ sanitization applied before returning.
 
 ```jsonc
 {
-  "is_correct": true,                 // exact/case-insensitive match with expected_answer
+  "is_correct": true,                 // semantic similarity or exact match
   "fuzzy_score": 84.2,
+  "defuzzified_score": 84.2,
   "degree_of_failure": 15.8,
   "performance_tier": "Moderate Mastery",
   "linguistic_remark": "Proficient with Methodical Focus: …",
@@ -170,8 +186,9 @@ sanitization applied before returning.
 ```
 
 > When `is_correct` is `true`, `assigned_hint` is a congratulation + fuzzy score line.
-> `gap_analysis` is also sanitized via `sanitize_gap_analysis` — hints **never** contain
-> the expected answer.
+> `gap_analysis` is sanitized via `sanitize_gap_analysis` — hints **never** contain
+> the expected answer. Class 9–10 hints are filtered via `filter_for_grade_level` to
+> eliminate any calculus terms.
 
 ---
 
@@ -221,7 +238,65 @@ tier-appropriate remediation hint (Level 1 Foundation → Level 4 Advanced Chall
 
 ---
 
-## 7. Internal Helpers (not endpoints)
+## 7. Material Ingestion & Custom Course Endpoints
+
+### `POST /api/material/upload`
+Uploads a document (PDF, TXT, MD, EPUB) and initiates parsing into structured chapters, flashcards, vector embeddings, and evaluation items.
+
+- **Form Fields**: `file` (Binary), `title` (str), `subject` (str), `academic_tier` (str), `async_mode` (bool, default `true`).
+- **Response (`async_mode: true`)**:
+  ```json
+  {
+    "status": "processing",
+    "message": "Async ingestion job queued for 'textbook.pdf'.",
+    "job_id": "job_a1b2c3d4",
+    "course_id": "custom_phy_89a12c"
+  }
+  ```
+
+### `POST /api/material/ingest`
+Ingests raw text, lecture notes, or syllabi directly via JSON.
+
+- **Request Body**:
+  ```json
+  {
+    "title": "Quantum Mechanics Intro",
+    "subject": "Physics",
+    "academic_tier": "Undergraduate",
+    "raw_text": "...",
+    "async_mode": true
+  }
+  ```
+
+### `GET /api/material/job/{job_id}/status`
+Polls real-time progress for background curriculum generation jobs.
+
+- **Response**:
+  ```json
+  {
+    "job_id": "job_a1b2c3d4",
+    "course_id": "custom_phy_89a12c",
+    "title": "Quantum Mechanics Intro",
+    "status": "processing",              // queued | processing | completed | failed
+    "progress": 65,                      // 0 - 100 percentage
+    "current_step": 3,                   // 1: Parsing | 2: Structuring | 3: Synthesizing | 4: Vectorizing | 5: Assessments
+    "current_message": "Synthesizing Chapter 2 of 4: Wave-Particle Duality...",
+    "course": null                       // Populated with complete Course Record when status == 'completed'
+  }
+  ```
+
+### `GET /api/material/courses`
+Lists all available built-in and ingested custom courses.
+
+### `GET /api/material/course/{course_id}`
+Retrieves full chapter details, deep theory axioms, flashcards, and question bank for a specific course ID.
+
+### `DELETE /api/material/course/{course_id}`
+Deletes a custom course JSON record and purges its vector embeddings from ChromaDB.
+
+---
+
+## 8. Internal Helpers (not endpoints)
 
 | Function | Location | Use |
 | --- | --- | --- |
@@ -233,7 +308,7 @@ tier-appropriate remediation hint (Level 1 Foundation → Level 4 Advanced Chall
 
 ---
 
-## 8. Frontend Consumption
+## 9. Frontend Consumption
 
 `App.jsx` targets `http://127.0.0.1:8000` directly with `fetch()`:
 
@@ -248,7 +323,7 @@ content rather than crashing the UI.
 
 ---
 
-## 9. Quick Manual Smoke Test (PowerShell)
+## 10. Quick Manual Smoke Test (PowerShell)
 
 ```powershell
 $body = @{ message="Why does F = ma?"; time_taken=12; consecutive_errors=0;

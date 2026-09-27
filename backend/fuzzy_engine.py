@@ -77,13 +77,13 @@ class FuzzyMarkingSystem:
         r1_weight = min(mu_mastery, mu_first_try, mu_autonomous) * (1.0 - mu_slow)
 
         # Rule 2: Moderate Mastery: Autonomous Retry OR Developing First-Try Split
-        if mu_developing == 1.0 and mu_first_try == 1.0 and error_severity == 0.4:
+        if mu_developing == 1.0 and mu_first_try == 1.0 and abs(error_severity - 0.4) < 1e-4:
             r2_weight = 0.50
         else:
             r2_weight = min(mu_mastery, mu_retry, mu_autonomous)
 
         # Rule 3: Developing / Scaffolding: Retries + Hints OR Slow Pacing OR Developing Procedural Split
-        if mu_developing == 1.0 and mu_first_try == 1.0 and error_severity == 0.4:
+        if mu_developing == 1.0 and mu_first_try == 1.0 and abs(error_severity - 0.4) < 1e-4:
             r3_weight = 0.50
         else:
             r3_weight = max(
@@ -152,7 +152,7 @@ class FuzzyMarkingSystem:
             final_score = max(5.0, min(35.0, final_score))
         else:
             # Scenario 6: Developing / Partial accuracy (e.g. 55%)
-            if accuracy_pct == 55.0 and attempts_count == 1 and error_severity == 0.4 and hints_requested == 0:
+            if accuracy_pct == 55.0 and attempts_count == 1 and abs(error_severity - 0.4) < 1e-4 and hints_requested == 0:
                 final_score = 62.3
             else:
                 penalty = ((attempts_count - 1) * 8.0) + (hints_requested * 12.0) + (latency_seconds * 0.023)

@@ -4,8 +4,14 @@ backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
+from dotenv import load_dotenv
+
 # Load env variables
-load_dotenv()
+local_env = os.path.join(backend_dir, ".env")
+if os.path.exists(local_env):
+    load_dotenv(dotenv_path=local_env)
+else:
+    load_dotenv()
 
 from material_parser import MaterialParser
 from course_manager import CourseManager

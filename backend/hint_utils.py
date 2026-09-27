@@ -63,3 +63,71 @@ HINT_FORMAT_DIRECTIVE = (
     "- NEVER state the final numerical result, exact answer string, or completed substitution.\n"
     "- Guide the student to discover the answer themselves."
 )
+
+
+def compute_semantic_similarity(student_ans: str, expected_ans: str) -> float:
+    """
+    Computes a robust semantic similarity score (0.0 to 1.0) between a student submission
+    and expected answer, supporting partial credit grading when offline.
+    Combines character/token normalization, numerical tolerance, and TF-IDF cosine similarity.
+    """
+    if not student_ans or not expected_ans:
+        return 0.0
+
+    s_clean = student_ans.strip().lower()
+    e_clean = expected_answer_clean = expected_ans.strip().lower()
+
+    # Exact string match
+    if s_clean == e_clean:
+        return 1.0
+
+    # Normalized match (stripping spaces, common math prefixes like "x=", "ans=")
+    s_norm = re.sub(r"^(?:x|ans|answer|result)\s*[:=]\s*", "", s_clean).replace(" ", "")
+    e_norm = re.sub(r"^(?:x|ans|answer|result)\s*[:=]\s*", "", e_clean).replace(" ", "")
+    if s_norm == e_norm:
+        return 1.0
+
+    # Check for direct substring containment (e.g. "nRT" inside "It is equal to nRT")
+    if len(e_clean) >= 3 and e_clean in s_clean:
+        return 0.95
+    if len(s_clean) >= 3 and s_clean in e_clean:
+        ratio = len(s_clean) / len(e_clean)
+        if ratio >= 0.7:
+            return round(0.75 + (0.2 * ratio), 2)
+
+    # Check for numerical value equivalence within ±5% tolerance
+    num_pattern = re.compile(r"[-+]?\d+(?:\.\d+)?")
+    s_nums = [float(x) for x in num_pattern.findall(s_clean)]
+    e_nums = [float(x) for x in num_pattern.findall(e_clean)]
+    if s_nums and e_nums and len(s_nums) == len(e_nums):
+        matches = True
+        for sn, en in zip(s_nums, e_nums):
+            tol = max(abs(en) * 0.05, 1e-4)
+            if abs(sn - en) > tol:
+                matches = False
+                break
+        if matches:
+            return 0.92
+
+    # Word token sets (ignoring basic English stopwords)
+    stop_words = {"the", "a", "an", "is", "are", "was", "were", "of", "in", "to", "and", "or", "for", "that", "this", "it", "by", "with", "be"}
+    s_words = {w for w in re.findall(r"\w+", s_clean) if w not in stop_words}
+    e_words = {w for w in re.findall(r"\w+", e_clean) if w not in stop_words}
+    jaccard = (len(s_words & e_words) / len(s_words | e_words)) if (s_words and e_words) else 0.0
+
+    # TF-IDF Cosine Similarity (Word-Level + Character-Level Fallback)
+    try:
+        from sklearn.feature_extraction.text import TfidfVectorizer
+        from sklearn.metrics.pairwise import cosine_similarity
+
+        vectorizer = TfidfVectorizer(
+            ngram_range=(1, 2),
+            stop_words="english",
+            lowercase=True
+        )
+        matrix = vectorizer.fit_transform([student_ans, expected_ans])
+        sim_word = float(cosine_similarity(matrix[0], matrix[1])[0][0])
+        score = max(sim_word, jaccard)
+        return round(min(1.0, max(0.0, score)), 3)
+    except Exception:
+        return round(jaccard, 3)

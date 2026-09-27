@@ -1,27 +1,71 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   BookOpen, 
   Sparkles, 
   Layers, 
-  Cpu, 
   ArrowRight, 
   ChevronRight, 
   ChevronDown,
   ChevronLeft,
   Lightbulb, 
   AlertTriangle, 
-  Compass, 
   CheckCircle2, 
   FileText, 
-  Maximize2,
   Atom,
   Binary,
-  GraduationCap,
   HelpCircle,
   Copy,
   Check
 } from 'lucide-react';
 import ChapterNav from './ChapterNav';
+
+/**
+ * Renders raw chapter source text as clean readable prose.
+ * Converts ### headings to warm styled headers, strips leading # symbols,
+ * and splits on double newlines for paragraph flow.
+ */
+function renderSourceAsProse(rawText) {
+  if (!rawText) return null;
+  const blocks = rawText.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean);
+
+  return blocks.map((block, i) => {
+    // Detect markdown headings (# ## ### ####)
+    const headingMatch = block.match(/^(#{1,4})\s+(.+)/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      const title = headingMatch[2].replace(/^[\d.]+\s*/, '').trim();
+      if (!title) return null;
+      const sizeClass = level <= 2 ? 'text-base' : 'text-sm';
+      return (
+        <h4
+          key={i}
+          className={`${sizeClass} font-bold text-ember-400 border-b border-sand-800 pb-1 mt-6 mb-2 tracking-tight`}
+        >
+          {title}
+        </h4>
+      );
+    }
+    // Detect numbered section headings like "1.1 Title of Section"
+    const sectionMatch = block.match(/^([1-9]\d*\.[0-9]+)\s+([A-Z].{2,})/);
+    if (sectionMatch && block.length < 120) {
+      const label = sectionMatch[1];
+      const title = sectionMatch[2].trim();
+      return (
+        <h4 key={i} className="text-sm font-bold text-clay-300 border-b border-sand-800/60 pb-1 mt-5 mb-2 tracking-tight">
+          <span className="font-mono text-sand-500 mr-2 text-xs">{label}</span>{title}
+        </h4>
+      );
+    }
+    // Regular prose paragraph
+    const clean = block.replace(/^[#\s]+/, '').trim();
+    if (!clean) return null;
+    return (
+      <p key={i} className="text-sm text-sand-300 leading-relaxed mb-3">
+        {clean}
+      </p>
+    );
+  });
+}
 
 export default function TheoryExplorer({
   courseTitle = 'Curriculum Theory',
@@ -39,11 +83,10 @@ export default function TheoryExplorer({
   const [isFlipped, setIsFlipped] = useState(false);
   const [showFullSource, setShowFullSource] = useState(false);
 
-  const currentChapter = (activeChapterIndex !== null && chapters[activeChapterIndex]) 
-    ? chapters[activeChapterIndex] 
-    : (chapters.length > 0 ? chapters[0] : null);
+  const currentChapterIndex = activeChapterIndex !== null ? activeChapterIndex : 0;
+  const currentChapter = chapters[currentChapterIndex] || (chapters.length > 0 ? chapters[0] : null);
 
-  const displayedCards = (currentChapter && currentChapter.cards && currentChapter.cards.length > 0)
+  const displayedCards = (currentChapter?.cards?.length > 0)
     ? currentChapter.cards
     : cards;
 
@@ -70,12 +113,6 @@ export default function TheoryExplorer({
       takeaway: "Always check what is conserved and what boundary conditions apply."
     }
   ];
-  const applications = deepTheory.applications || [
-    {
-      domain: "Real-World Systems & Engineering Context",
-      description: "Directly applied in designing analytical frameworks, predictive models, and diagnostic pipelines."
-    }
-  ];
   const misconceptions = deepTheory.misconceptions || [
     {
       trap: "Superficial Formula Application Without Verifying Operational Domain",
@@ -83,11 +120,33 @@ export default function TheoryExplorer({
     }
   ];
 
+  // Normalize objectives — can be strings or {objective: "..."} objects
+  const rawObjectives = currentChapter?.objectives || [
+    "Master fundamental definitions and mechanics",
+    "Apply analytical formulations to problem solving",
+    "Identify key boundary conditions and diagnostic traps"
+  ];
+  const objectives = rawObjectives.map(o => (typeof o === 'string' ? o : (o?.objective || o?.text || JSON.stringify(o))));
+
+  // First mental model's analogy as a warm pull-quote hook
+  const hookAnalogy = mentalModels[0]?.analogy || null;
+
   const handleCopy = (text, id) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
+
+  const handleChapterChange = (idx) => {
+    onSelectChapter?.(idx);
+    setCardIndex(0);
+    setIsFlipped(false);
+    setExpandedSection(null);
+    setShowFullSource(false);
+  };
+
+  const hasPrev = currentChapterIndex > 0;
+  const hasNext = currentChapterIndex < chapters.length - 1;
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto animate-fadeIn">
@@ -95,39 +154,79 @@ export default function TheoryExplorer({
       {chapters.length > 1 && (
         <ChapterNav
           chapters={chapters}
-          activeChapterIndex={activeChapterIndex}
-          onSelectChapter={(idx) => {
-            onSelectChapter(idx);
-            setCardIndex(0);
-            setIsFlipped(false);
-            setExpandedSection(null);
-          }}
+          activeChapterIndex={currentChapterIndex}
+          onSelectChapter={handleChapterChange}
           activeColor={activeColor}
         />
       )}
 
       {/* TOP HEADER CONTROLS */}
       <div className="glass-panel p-6 rounded-3xl border border-sand-800 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1.5">
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-wider bg-clay-500/20 text-clay-300 border border-clay-500/30">
               Interactive Theory Explorer
             </span>
             <span className="text-sand-600">•</span>
             <span className="text-xs font-mono text-sand-400">
-              {currentChapter ? `Chapter ${currentChapter.chapter_index || 1} of ${chapters.length || 1}` : courseTitle}
+              {currentChapter ? `Chapter ${currentChapterIndex + 1} of ${chapters.length}` : courseTitle}
             </span>
           </div>
           <h2 className="text-xl font-extrabold text-sand-50 tracking-tight">
             {currentChapter?.title || courseTitle}
           </h2>
-          <p className="text-xs text-sand-400 mt-1 max-w-2xl">
-            {currentChapter?.summary ? currentChapter.summary.slice(0, 160) + '...' : 'Explore detailed theoretical principles, mathematical formulations, and mental models.'}
-          </p>
+
+          {/* Warm analogy pull-quote hook — shown once, right under the title */}
+          {hookAnalogy && viewMode === 'reader' && (
+            <div className="mt-3 flex items-start gap-2.5 bg-amber-500/8 border border-amber-500/20 rounded-2xl px-4 py-2.5">
+              <Lightbulb className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-200 leading-relaxed italic font-serif">{hookAnalogy}</p>
+            </div>
+          )}
+
+          {/* Subsection outline pills — if subsections exist */}
+          {currentChapter?.subsections?.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-3">
+              {currentChapter.subsections.map((sub, i) => (
+                <span
+                  key={i}
+                  className="px-2 py-0.5 rounded-lg text-[10px] font-mono bg-sand-800 text-sand-400 border border-sand-700"
+                >
+                  §{sub.sec_idx}
+                  {sub.title && sub.title !== currentChapter.title
+                    ? ` · ${sub.title.length > 30 ? sub.title.slice(0, 28) + '…' : sub.title}`
+                    : ''}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* VIEW MODE TOGGLE BUTTONS */}
-        <div className="flex items-center gap-2 self-start md:self-auto">
+        {/* RIGHT: view mode toggle + nav arrows + practice */}
+        <div className="flex items-center gap-2 self-start md:self-auto flex-shrink-0">
+          {/* Prev / Next chapter arrows */}
+          {chapters.length > 1 && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => hasPrev && handleChapterChange(currentChapterIndex - 1)}
+                disabled={!hasPrev}
+                className="p-2 rounded-xl bg-sand-900 border border-sand-800 text-sand-400 hover:text-sand-100 hover:border-sand-600 transition disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Previous chapter"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => hasNext && handleChapterChange(currentChapterIndex + 1)}
+                disabled={!hasNext}
+                className="p-2 rounded-xl bg-sand-900 border border-sand-800 text-sand-400 hover:text-sand-100 hover:border-sand-600 transition disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Next chapter"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* View mode toggle */}
           <div className="flex bg-sand-900/80 p-1 rounded-2xl border border-sand-800">
             <button
               onClick={() => setViewMode('reader')}
@@ -200,12 +299,8 @@ export default function TheoryExplorer({
                 <span>Core Learning Objectives</span>
               </div>
               <ul className="space-y-2.5">
-                {(currentChapter?.objectives || [
-                  "Master fundamental definitions and mechanics",
-                  "Apply analytical formulations to problem solving",
-                  "Identify key boundary conditions and diagnostic traps"
-                ]).map((obj, i) => (
-                  <li key={i} className="flex items-start gap-2.5 text-xs text-sand-300 leading-normal">
+                {objectives.map((obj, i) => (
+                  <li key={i} className="flex items-start gap-2.5 text-xs sm:text-sm text-sand-300 leading-relaxed">
                     <span className="w-4 h-4 rounded-full bg-olive-500/20 text-olive-400 font-mono text-[10px] flex items-center justify-center flex-shrink-0 mt-0.5 font-bold">
                       {i + 1}
                     </span>
@@ -246,7 +341,7 @@ export default function TheoryExplorer({
                     </button>
                   </div>
                   <h4 className="text-sm font-bold text-sand-100">{pr.title}</h4>
-                  <p className="text-xs text-sand-300 leading-relaxed font-sans">{pr.content}</p>
+                  <p className="text-xs sm:text-sm text-sand-300 leading-relaxed">{pr.content}</p>
                 </div>
               ))}
             </div>
@@ -282,11 +377,11 @@ export default function TheoryExplorer({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                     <div className="p-3 rounded-xl bg-sand-900/50 border border-sand-800/80">
                       <span className="text-[10px] font-bold uppercase text-sand-400 block mb-1">Derivation Logic</span>
-                      <p className="text-sand-300">{fm.derivation}</p>
+                      <p className="text-sand-300 text-xs sm:text-sm leading-relaxed">{fm.derivation}</p>
                     </div>
                     <div className="p-3 rounded-xl bg-sand-900/50 border border-sand-800/80">
                       <span className="text-[10px] font-bold uppercase text-sand-400 block mb-1">State Variables & Constants</span>
-                      <p className="text-sand-300">{fm.variables}</p>
+                      <p className="text-sand-300 text-xs sm:text-sm leading-relaxed">{fm.variables}</p>
                     </div>
                   </div>
                 </div>
@@ -298,18 +393,18 @@ export default function TheoryExplorer({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Mental Model & Analogies */}
             <div className="glass-panel p-6 rounded-3xl border border-sand-800 space-y-4 bg-gradient-to-br from-sand-900/80 via-sand-950 to-amber-950/10">
-              <div className="flex items-center gap-2.5 text-xs font-bold uppercase tracking-wider text-amber-800">
+              <div className="flex items-center gap-2.5 text-xs font-bold uppercase tracking-wider text-amber-500">
                 <Lightbulb className="w-4 h-4" />
                 <span>Mental Models & Analogies</span>
               </div>
               {mentalModels.map((mm, idx) => (
                 <div key={idx} className="space-y-2.5">
                   <h4 className="text-sm font-bold text-sand-50">{mm.concept}</h4>
-                  <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-800 leading-relaxed font-serif">
-                    "{mm.analogy}"
+                  <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs sm:text-sm text-amber-100 leading-relaxed font-serif">
+                    {mm.analogy}
                   </div>
-                  <div className="text-xs text-sand-300 flex items-center gap-2">
-                    <strong className="text-amber-800">Key Intuition:</strong>
+                  <div className="text-xs text-sand-300 flex items-start gap-2">
+                    <strong className="text-amber-400 flex-shrink-0">Key Intuition:</strong>
                     <span>{mm.takeaway}</span>
                   </div>
                 </div>
@@ -325,10 +420,10 @@ export default function TheoryExplorer({
               {misconceptions.map((mc, idx) => (
                 <div key={idx} className="space-y-2.5">
                   <div className="text-xs text-clay-300 font-semibold flex items-start gap-2">
-                    <span className="text-clay-400 font-bold">⚠️ Trap:</span>
+                    <span className="text-clay-400 font-bold flex-shrink-0">⚠ Trap:</span>
                     <span>{mc.trap}</span>
                   </div>
-                  <div className="p-3.5 rounded-xl bg-clay-500/10 border border-clay-500/20 text-xs text-sand-200 leading-relaxed">
+                  <div className="p-3.5 rounded-xl bg-clay-500/10 border border-clay-500/20 text-xs sm:text-sm text-sand-200 leading-relaxed">
                     <strong className="text-olive-400 block mb-1">Correct Conceptual Approach:</strong>
                     {mc.correction}
                   </div>
@@ -337,7 +432,7 @@ export default function TheoryExplorer({
             </div>
           </div>
 
-          {/* Section 4: Expandable Full Original Source Material */}
+          {/* Section 4: Expandable Full Original Source Material — rendered as clean prose */}
           {currentChapter?.full_text && (
             <div className="glass-panel p-6 rounded-3xl border border-sand-800 space-y-3">
               <button
@@ -346,14 +441,14 @@ export default function TheoryExplorer({
               >
                 <div className="flex items-center gap-2">
                   <FileText className="w-4 h-4 text-clay-400" />
-                  <span>Inspect Complete Ingested Chapter Source Text ({Math.round(currentChapter.full_text.length / 5)} words)</span>
+                  <span>Inspect Complete Ingested Chapter Source Text (~{Math.round(currentChapter.full_text.length / 5)} words)</span>
                 </div>
                 {showFullSource ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
               </button>
 
               {showFullSource && (
-                <div className="p-5 rounded-2xl bg-sand-950 border border-sand-900 text-xs font-mono text-sand-300 max-h-[400px] overflow-y-auto custom-scrollbar leading-relaxed whitespace-pre-wrap animate-fadeIn">
-                  {currentChapter.full_text}
+                <div className="p-5 rounded-2xl bg-sand-950 border border-sand-900 max-h-[520px] overflow-y-auto custom-scrollbar animate-fadeIn">
+                  {renderSourceAsProse(currentChapter.full_text)}
                 </div>
               )}
             </div>
@@ -396,7 +491,7 @@ export default function TheoryExplorer({
                     {card.question}
                   </p>
 
-                  <div className={`text-xs text-sand-300 leading-relaxed font-sans pt-2 border-t border-sand-800/80 whitespace-pre-line ${
+                  <div className={`text-xs sm:text-sm text-sand-300 leading-relaxed pt-2 border-t border-sand-800/80 whitespace-pre-line ${
                     isExpanded ? 'block' : 'line-clamp-4'
                   }`}>
                     {card.answer}
@@ -425,7 +520,7 @@ export default function TheoryExplorer({
                 Focus Study Card {displayedCards.length > 0 ? Math.min(cardIndex + 1, displayedCards.length) : 0} of {displayedCards.length}
               </span>
             </div>
-            <span className="text-[11px] font-mono text-sand-400">Click card or spacebar to flip</span>
+            <span className="text-[11px] font-mono text-sand-400">Click card to flip</span>
           </div>
 
           {displayedCards.length > 0 ? (
@@ -469,7 +564,7 @@ export default function TheoryExplorer({
                       <span className="text-[10px] font-mono text-clay-300">Back (Synthesis)</span>
                     </div>
 
-                    <div className="my-4 text-xs sm:text-sm text-sand-200 leading-relaxed font-sans whitespace-pre-line space-y-2 overflow-y-auto custom-scrollbar max-h-[220px]">
+                    <div className="my-4 text-xs sm:text-sm text-sand-200 leading-relaxed whitespace-pre-line space-y-2 overflow-y-auto custom-scrollbar max-h-[240px]">
                       {displayedCards[cardIndex]?.answer}
                     </div>
 
