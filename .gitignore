@@ -23,11 +23,13 @@ backend/data/ednet/KT1.zip
 backend/data/ednet/ednet_small_sample.csv
 backend/data/dialogue/teacher_student_corpus/*.json
 backend/data/courses/custom_*.json
+backend/data/courses/.archive/
 
 # System file logs and local databases
 *.log
 *.db
 *.sqlite3
 *.safetensors
+*.bak
 training/*adapter*/
 .DS_Store

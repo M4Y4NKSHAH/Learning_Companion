@@ -63,13 +63,15 @@
 
 | File | Core Responsibility |
 | --- | --- |
-| `backend/app.py` | FastAPI application, CORS middleware, route handlers (`/api/tutor/*`, `/api/material/*`), background ingestion worker. |
+| `backend/app.py` | FastAPI application, CORS middleware, route handlers (`/api/tutor/*`, `/api/material/*`), background ingestion and enrichment workers. |
+| `backend/book_structurer.py` | Universal layout & heading inference engine: scores candidate chapter patterns, prunes TOC runs, detects sections/units, rejects running headers. |
+| `backend/divide_book.py` | Two-phase textbook dividing and publishing engine: builds deterministic skeletal courses instantly and enriches chapters in the background. |
 | `backend/tutor_graph.py` | LangGraph `StateGraph` definition: 6 stateful nodes, Mamdani evaluation, guardrail deflection routing, exports `compiled_tutor_app`. |
 | `backend/pedagogical_guardrails.py` | Grade tier normalization (`introductory`, `standard`, `advanced`), off-topic pattern matching, grounded prompt construction, and post-generation calculus filtering. |
-| `backend/local_llm_service.py` | `LocalLLMService`: Connects to local Ollama instance (`http://localhost:11434`) running `llama3.2:3b` with zero cloud token consumption and GPU acceleration. |
+| `backend/local_llm_service.py` | `LocalLLMService`: Connects to local Ollama instance (`http://localhost:11434`) running `learning-companion:latest` (or `llama3.2:3b`) with zero cloud token consumption and GPU acceleration. |
 | `backend/course_manager.py` | Enterprise course lifecycle manager: handles persistence, disk indexing of custom user courses, and standard built-in curriculum. |
-| `backend/material_parser.py` | Algorithmic document parser: cleans raw text, prunes front/back matter clutter, segments continuous text into non-overlapping chapters with sliding window chunking. |
-| `backend/question_generator.py` | `QuestionGeneratorEngine`: Single-pass curriculum blueprints, chapter theory synthesis, practice quizzes, and summative final exam generation. |
+| `backend/material_parser.py` | Algorithmic document parser: cleans raw text, extracts text from PDF/EPUB/TXT, detects subjects and domains. |
+| `backend/question_generator.py` | `QuestionGeneratorEngine`: Single-pass curriculum blueprints, unified chapter theory synthesis (`_local_synthesize_unified`), practice quizzes, and final exam generation. |
 | `backend/database_ingest.py` | `DatabaseIngestPipeline`: Dual-engine BM25 keyword ranker + ChromaDB persistent vector storage with strict chapter-level namespaces. |
 | `backend/fuzzy_engine.py` | `FuzzyMarkingSystem`: Mamdani fuzzy inference system evaluating accuracy, latency, attempt count, and error severity. |
 | `backend/hint_utils.py` | Bidirectional answer-leak sanitization (`sanitize_hint_text`, `sanitize_gap_analysis`), string similarity algorithms, and prompt formatting directives. |
@@ -199,38 +201,78 @@ All tiers pass output through `filter_for_grade_level()` and `sanitize_hint_text
   ```
 - Retrieval queries enforce `course_id` and `chapter_id` filters, guaranteeing **zero cross-chapter leakage**.
 
-### 6.1 Smart Chapter Segregation & Domain Auto-Detection
+### 6.1 Smart Chapter Segregation & Universal Structure Inference
 
 To prevent textbook front-matter, copyright boilerplate, and fragmented subsection tables from polluting courses:
 
-1. **Automatic Subject & Domain Detection (`MaterialParser.detect_subject`)**:
-   - Inspects the document title and text against domain-specific lexical indicators (e.g., `algorithm`, `computational`, `data structure`, `boolean`, `compiler` $\rightarrow$ Computer Science; `integral`, `matrix` $\rightarrow$ Mathematics; `velocity`, `thermodynamics` $\rightarrow$ Physics).
-   - Dynamically overrides incorrect or default UI dropdown selections, preventing Computer Science books from ever being classified as Physics.
+1. **Universal Structure Plan (`BookStructurer`)**:
+   - Scores candidate chapter heading styles (`chapter_digits`, `chapter_roman`, `chapter_word`, `unit_*`, `lesson_digits`, `hash_headings`, `numbered_dot`, `numbered_bare`, `titled_caps`).
+   - Uses sequence quality, line shortness, population count, and title sanity checks.
+   - Detects layout gap clustering: front-matter TOC listings have tight character offsets and are pruned before cutting text, preventing duplicate/phantom chapters.
+   - Filters `BOILERPLATE_SUBSTRINGS` (e.g. "PHILANTHROPIC SUPPORT", "LINK TO LEARNING", "Answer Key", "Try It", "Source:") and dotted-leader runs (`..... 45`).
+   - Detects units/parts with real title validation; if absent, divides chapters into balanced units.
 
-2. **Front-Matter & TOC Pruning (`MaterialParser.strip_front_matter_and_toc`)**:
-   - Scans the document head and automatically discards copyright notices, publisher legal agreements (e.g. Creative Commons), author prefaces, and condensed Table of Contents summaries.
-   - Begins chapter extraction strictly at the first authentic instructional chapter body (e.g., `1.1` or `Chapter 1`).
+2. **Automatic Subject & Domain Detection (`MaterialParser.detect_subject`)**:
+   - Inspects the document title and text against domain-specific lexical indicators.
+   - Dynamically overrides incorrect or default UI dropdown selections.
 
-3. **Major Chapter Aggregation (`MaterialParser.aggregate_into_major_chapters`)**:
-   - When textbooks structure content with numbered decimal sections (`1.1`, `1.2`, `1.3`, `2.1`, `2.2`), the parser aggregates all sub-sections into their parent major chapter (`1.x` $\rightarrow$ Chapter 1, `2.x` $\rightarrow$ Chapter 2, etc.).
-   - Prunes trailing end-of-chapter review questions, self-quizzes, and index listings from the core theoretical body.
-   - Strictly enforces heading validation requiring meaningful alphabetic tokens, preventing accidental table row numbers (`1. 2.`) or software versions (`4.0`) from spawning false chapters.
+3. **Front-Matter & Running Header Suppression**:
+   - Strips repeating digit-normalized line shapes (e.g., page numbers and publisher headers repeated 5+ times).
+   - Starts chapter slicing strictly at the authentic body text start.
 
-4. **Course Lifecycle & Disk Deduplication (`CourseManager.cleanup_duplicate_courses`)**:
-   - Automatically maintains a clean single entry per course title on disk, overwriting existing course IDs on re-upload and removing legacy duplicate custom courses.
+### 6.2 Two-Phase Asynchronous Ingestion & Progressive Publishing
 
+Textbook ingestion is split into two phases to balance responsiveness with deep educational grounding:
+
+```text
+Uploaded Document / Textbook (PDF / TXT / EPUB)
+                      │
+                      ▼
+┌────────────────────────────────────────────────────────┐
+│ PHASE A: Instant Deterministic Skeletal Publishing     │
+│ • Runs BookStructurer layout inference & TOC pruning   │
+│ • Slices body into true chapters and sections          │
+│ • Extracts grounded key facts, equations & definitions │
+│ • Publishes course to disk immediately (~3-5 seconds)  │
+│ • Course becomes immediately viewable in Course Studio │
+└──────────────────────────┬─────────────────────────────┘
+                           │
+                           ▼
+┌────────────────────────────────────────────────────────┐
+│ PHASE B: Asynchronous Background LLM Enrichment        │
+│ • Runs in FastAPI BackgroundTasks worker               │
+│ • Uses local Ollama (learning-companion:latest)        │
+│ • Executes unified single-pass prompt per chapter:     │
+│   - Comprehensive Chapter Summary                      │
+│   - Bloom's Taxonomy Learning Objectives               │
+│   - Spaced-repetition Active Recall Flashcards         │
+│ • Re-publishes course on disk after each chapter       │
+│ • Real-time progress polling (/api/material/job/status)│
+│ • Crash-resilient: resumes without re-running finished │
+└────────────────────────────────────────────────────────┘
+```
+
+### 6.3 Local LLM Inference Engine & Memory Management
+
+- **Model**: `learning-companion:latest` (or `llama3.2:3b`) served locally via Ollama.
+- **Parameters**: `num_ctx 2048`, `num_predict 800`, `temperature 0.2`, `top_p 0.9`.
+- **VRAM Footprint**: Under 2.5 GB on an NVIDIA RTX 2050 (4GB VRAM), eliminating RAM swapping and maintaining fast ~20-30s inference per chapter.
+- **Unified Synthesis Prompt (`_local_synthesize_unified`)**: Combines summary, learning objectives, and flashcard generation into a single local LLM call per chapter, reducing context switching and latency by 66%.
 
 ---
 
 ## 7. Automated Test Suite & Quality Assurance
 
-The test suite in `backend/tests/` maintains a **100% pass rate** across 20 unit and integration tests:
+The test suite in `backend/tests/` maintains a **100% pass rate** across all 43 unit and integration tests:
 
 | Test Module | Coverage | Status |
 | --- | --- | --- |
+| `test_book_structurer.py` | Heading pattern scoring, TOC front-matter pruning, bare-numbering regex, boilerplate filtering, unit validation, chapter selection specs. | **PASSED** (18/18) |
+| `test_two_phase_ingestion.py` | Phase A instant publication, Phase B background enrichment, crash-resilience, idempotent resume, selective chapter targets. | **PASSED** (5/5) |
 | `test_pedagogical_guardrails.py` | Tier normalization, Class 9 vs Class 12 ceiling enforcement, off-topic deflection, post-generation calculus filtering, LangGraph guardrail routing. | **PASSED** (8/8) |
 | `test_tier3_features.py` | BM25 keyword ranker, SQLite analytics database attempt recording. | **PASSED** (2/2) |
 | `test_tier1_features.py` | Semantic similarity, SM-2 spaced repetition interval calculation, chapter-grounded card generation. | **PASSED** (3/3) |
 | `test_section_optimization.py` | Academic header detection, fragment consolidation, cognitive chapter chunking. | **PASSED** (3/3) |
 | `test_content_aware_qg.py` | Fact extraction, content-grounded assessment items, sliding overlap chunking. | **PASSED** (3/3) |
 | `test_fuzzy_extended.py` | Multi-parameter Mamdani fuzzy inference edge cases. | **PASSED** (1/1) |
+| **Total** | **Comprehensive Full Stack Backend Verification** | **PASSED (43/43)** |

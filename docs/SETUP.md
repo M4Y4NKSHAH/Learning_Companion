@@ -7,10 +7,19 @@
 
 ## 1. Prerequisites
 
-- **Python 3.11+** (a `venv/` already exists in the repo — Python 3.13)
-- **Node.js + npm** (required for the Vite frontend)
-- A **Google AI (Gemini) API key** — optional but strongly recommended. Without it the
-  app still runs using hardcoded fallback responses.
+- **Python 3.11+** (Python 3.13 tested)
+- **Node.js 18+ & npm** (required for the Vite frontend)
+- **Local Ollama (for 100% offline LLM tutoring & curriculum enrichment):**
+  1. Install [Ollama](https://ollama.com).
+  2. Pull the base Llama 3.2 3B model:
+     ```powershell
+     ollama pull llama3.2:3b
+     ```
+  3. Register the optimized Socratic educational model:
+     ```powershell
+     ollama create learning-companion -f training/Modelfile
+     ```
+- A **Google AI (Gemini) API key** — optional cloud fallback. Without it the app runs completely offline via local Ollama or rule-based deterministic fallbacks.
 
 Check versions:
 
@@ -18,6 +27,7 @@ Check versions:
 python --version
 node --version
 npm --version
+ollama list
 ```
 
 ---

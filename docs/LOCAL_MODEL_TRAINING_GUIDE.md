@@ -134,14 +134,53 @@ print("Export complete: llama3.2-3b-edu-adapter.zip ready for download!")
    # llama3.2:3b    a80c4f17acd5    2.0 GB    seconds ago
    ```
 
-### Step 2: System Architecture Integration
+### Step 2: Build the `learning-companion` Custom Model
+Ollama v0.35+ requires either fused GGUF weights or a custom `Modelfile` with parameterized directives. The repository provides `training/Modelfile`:
+
+```dockerfile
+FROM llama3.2:3b
+
+PARAMETER temperature 0.2
+PARAMETER top_p 0.9
+PARAMETER top_k 40
+PARAMETER num_ctx 2048
+PARAMETER num_predict 800
+
+SYSTEM """You are the Learning Companion Educational Assistant, an expert Socratic tutor and curriculum synthesizer.
+Your goal is to guide students to understand concepts deeply through scaffolding, questions, and structured explanations.
+Rules:
+1. Always adapt explanations to the student's academic tier.
+2. For Class 9-10, NEVER use calculus, tensors, or college-level terminology. Use intuitive real-world analogies.
+3. For Class 11-12, use rigorous vector mechanics and single-variable calculus derivations.
+4. When synthesizing curriculum, output valid JSON matching the requested schema exactly.
+5. In tutoring mode, use Socratic questioning: never give the direct answer immediately if the student has not reasoned through it.
+6. Strictly deflect non-academic questions politely back to the active chapter."""
+```
+
+Build the custom model:
+```bash
+ollama create learning-companion -f training/Modelfile
+```
+
+Verify the model appears in your local list:
+```bash
+ollama list
+# NAME                       ID              SIZE      MODIFIED
+# learning-companion:latest  4bfa3516bf49    2.0 GB    seconds ago
+# llama3.2:3b                a80c4f17acd5    2.0 GB    hours ago
+```
+
+### Step 3: System Architecture Integration & VRAM Sizing
 The backend connects to Ollama via `backend/local_llm_service.py` (`LocalLLMService`):
+- **Model Hierarchy**: `LocalLLMService` checks available models at startup:
+  1. `learning-companion` (Custom educational prompt & parameters)
+  2. `llama3.2:3b` (Base Llama model fallback)
+  3. `deepseek-r1:1.5b` (Reasoning model fallback)
 - **Endpoint**: `http://localhost:11434/api/generate`
-- **Payload Constraints**: Max input token limit (3500 chars) to prevent KV cache GPU out-of-memory.
-- **VRAM Utilization**: ~2.0 GB on an NVIDIA RTX 2050 (4GB VRAM). Leaves 2.0 GB headroom for system display and embedding models.
+- **VRAM Utilization**: `num_ctx 2048` keeps the KV cache memory usage under 2.5 GB on an NVIDIA RTX 2050 (4GB VRAM). This leaves 1.5 GB headroom for the OS and prevents Windows GPU memory swapping to system RAM.
 - **Failover Logic**:
   ```text
-  Local Ollama LLM (Offline, Free)
+  Local Ollama LLM (learning-companion:latest, 100% Offline, $0)
        │ (if unavailable or timeout)
        ▼
   Google Gemini 2.5 Flash Cloud API

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Upload, 
   FileText, 
@@ -19,7 +19,9 @@ import {
   GraduationCap,
   FileCode,
   Check,
-  Clock
+  Clock,
+  Search,
+  Filter
 } from 'lucide-react';
 
 const SUBJECT_OPTIONS = ['Physics', 'Biology', 'Mathematics', 'Computer Science', 'General Science', 'Engineering', 'Economics'];
@@ -43,6 +45,10 @@ export default function CourseStudioView({
   const [rawText, setRawText] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   
+  // Search & Filter state for course library
+  const [courseSearchQuery, setCourseSearchQuery] = useState('');
+  const [subjectFilter, setSubjectFilter] = useState('All');
+
   // Pipeline processing state
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStep, setProcessingStep] = useState(0);
@@ -51,6 +57,43 @@ export default function CourseStudioView({
   const fileInputRef = useRef(null);
 
   const activeCourse = courses.find(c => c.course_id === activeCourseId) || courses[0] || null;
+
+  // Filtered courses based on search & subject pill
+  const filteredCourses = useMemo(() => {
+    return courses.filter(c => {
+      const matchSearch = !courseSearchQuery.trim() || 
+        c.title.toLowerCase().includes(courseSearchQuery.toLowerCase()) ||
+        (c.subject && c.subject.toLowerCase().includes(courseSearchQuery.toLowerCase())) ||
+        (c.academic_tier && c.academic_tier.toLowerCase().includes(courseSearchQuery.toLowerCase()));
+      const matchSubject = subjectFilter === 'All' || c.subject === subjectFilter;
+      return matchSearch && matchSubject;
+    });
+  }, [courses, courseSearchQuery, subjectFilter]);
+
+  // Group chapters into the pedagogically coherent units produced by the book-processing engine.
+  const unitGroups = useMemo(() => {
+    const chapters = activeCourse?.chapters || [];
+    if (chapters.length === 0) return [];
+    const declared = Array.isArray(activeCourse?.units) ? activeCourse.units : [];
+    const nameByIndex = new Map(declared.map(u => [u.unit_index, u.unit_name]));
+    const hasUnits = chapters.some(ch => ch.unit_index !== undefined && ch.unit_index !== null);
+    if (!hasUnits) {
+      return [{ unitIndex: null, unitName: null, chapters }];
+    }
+    const groups = new Map();
+    chapters.forEach(ch => {
+      const key = ch.unit_index ?? 1;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          unitIndex: key,
+          unitName: ch.unit_name || nameByIndex.get(key) || `Unit ${key}`,
+          chapters: []
+        });
+      }
+      groups.get(key).chapters.push(ch);
+    });
+    return [...groups.values()].sort((a, b) => (a.unitIndex ?? 0) - (b.unitIndex ?? 0));
+  }, [activeCourse]);
 
   const handleFileDrop = (e) => {
     e.preventDefault();
@@ -170,7 +213,7 @@ export default function CourseStudioView({
 
   const [elapsedSec, setElapsedSec] = useState(0);
 
-  React.useEffect(() => {
+  useEffect(() => {
     let timer = null;
     if (isProcessing) {
       setElapsedSec(0);
@@ -191,28 +234,31 @@ export default function CourseStudioView({
     { label: 'Generating Practice Quizzes & Exam Items', icon: BrainCircuit, desc: 'Synthesizing evaluation question bank' },
   ];
 
+  // Subject options for filter tabs
+  const filterTabs = ['All', 'Physics', 'Mathematics', 'Biology', 'Computer Science'];
+
   return (
     <div className="space-y-6 animate-fadeIn">
       {/* Top Banner & Mode Toggle */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 glass-panel p-6 rounded-2xl border border-sand-800">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 glass-panel p-6 rounded-2xl border border-sand-800 shadow-xl">
         <div>
-          <div className="flex items-center gap-2.5 mb-1">
+          <div className="flex items-center gap-2.5 mb-1.5">
             <div className="p-2 bg-gradient-to-tr from-clay-600 to-ember-600 rounded-xl text-white shadow-lg shadow-sand-300/25">
               <Layers className="w-5 h-5" />
             </div>
-            <h2 className="text-lg font-bold text-sand-50 tracking-tight">Course Studio & Material Ingestion</h2>
+            <h2 className="text-lg font-bold text-sand-50 tracking-tight">Course Studio & Curriculum Manager</h2>
           </div>
-          <p className="text-xs text-sand-400 max-w-xl">
-            Ingest custom textbooks, PDF research papers, or syllabus notes. Our AI decomposes materials into chapters, high-retention flashcard decks, and testing banks.
+          <p className="text-xs text-sand-400 max-w-xl leading-relaxed">
+            Ingest custom textbooks, PDF research papers, or syllabus notes. Our AI decomposes materials into authentic chapters, high-retention flashcard decks, and testing banks.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => setActiveTab('studio')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
+            className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
               activeTab === 'studio'
-                ? 'bg-sand-200 text-sand-900 shadow-md font-bold'
+                ? 'bg-sand-100 text-sand-950 shadow-md font-bold'
                 : 'bg-sand-900/60 border border-sand-800 text-sand-400 hover:text-sand-50'
             }`}
           >
@@ -221,9 +267,9 @@ export default function CourseStudioView({
           </button>
           <button
             onClick={() => setActiveTab('create')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 shadow-lg ${
+            className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 shadow-lg ${
               activeTab === 'create'
-                ? 'bg-gradient-to-r from-clay-600 to-ember-600 text-white shadow-sand-300/25'
+                ? 'bg-gradient-to-r from-clay-600 to-ember-600 text-white shadow-sand-300/25 font-bold'
                 : 'bg-clay-950/40 border border-clay-500/30 text-clay-300 hover:bg-clay-900/40'
             }`}
           >
@@ -307,7 +353,7 @@ export default function CourseStudioView({
 
               {elapsedSec > 10 && (
                 <p className="text-[11px] text-sand-500 font-mono italic max-w-md">
-                  💡 Processing extensive multi-page textbook/paper. Generating high-retention flashcards and embedding vector database...
+                  💡 Processing multi-page textbook. Generating high-retention flashcards and embedding vector database...
                 </p>
               )}
             </div>
@@ -322,7 +368,7 @@ export default function CourseStudioView({
 
               {errorMsg && (
                 <div className="flex items-center gap-2.5 p-3.5 bg-clay-500/10 border border-clay-500/30 rounded-xl text-clay-300 text-xs">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <AlertCircle className="w-4 h-4 shrink-0" />
                   <span>{errorMsg}</span>
                 </div>
               )}
@@ -361,7 +407,7 @@ export default function CourseStudioView({
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    placeholder="e.g. Research Paper - GR.05, Advanced Organic Synthesis, Classical Mechanics"
+                    placeholder="e.g. Calculus (OpenStax), Advanced Data Structures, Classical Mechanics"
                     className="w-full bg-sand-900/90 border border-sand-700 rounded-xl px-4 py-2.5 text-xs text-sand-50 placeholder-sand-500 focus:outline-none focus:border-clay-500 focus:ring-1 focus:ring-clay-500"
                   />
                 </div>
@@ -484,12 +530,45 @@ export default function CourseStudioView({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left Column: Course Selector List */}
           <div className="lg:col-span-4 space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-sand-400 px-1">
-              Available Courses ({courses.length})
-            </h3>
+            <div className="flex items-center justify-between px-1">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-sand-400">
+                Available Courses ({filteredCourses.length})
+              </h3>
+            </div>
+
+            {/* Quick Search & Subject Filter Bar */}
+            <div className="space-y-2">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-sand-500 absolute left-3 top-3" />
+                <input
+                  type="text"
+                  value={courseSearchQuery}
+                  onChange={(e) => setCourseSearchQuery(e.target.value)}
+                  placeholder="Search course title or subject..."
+                  className="w-full bg-sand-900/80 border border-sand-800 rounded-xl pl-8 pr-3 py-2 text-xs text-sand-100 placeholder-sand-500 focus:outline-none focus:border-clay-500 transition"
+                />
+              </div>
+
+              {/* Subject quick filter pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar">
+                {filterTabs.map((fTab) => (
+                  <button
+                    key={fTab}
+                    onClick={() => setSubjectFilter(fTab)}
+                    className={`text-[10px] font-medium px-2.5 py-1 rounded-lg transition whitespace-nowrap ${
+                      subjectFilter === fTab
+                        ? 'bg-clay-600 text-white font-bold shadow-sm'
+                        : 'bg-sand-900/60 border border-sand-800 text-sand-400 hover:text-sand-200'
+                    }`}
+                  >
+                    {fTab}
+                  </button>
+                ))}
+              </div>
+            </div>
             
-            <div className="space-y-2.5 max-h-[680px] overflow-y-auto custom-scrollbar pr-1">
-              {courses.map((c) => {
+            <div className="space-y-2.5 max-h-[660px] overflow-y-auto custom-scrollbar pr-1">
+              {filteredCourses.map((c) => {
                 const isSelected = activeCourse && activeCourse.course_id === c.course_id;
                 const isCustom = !c.is_builtin;
 
@@ -499,13 +578,13 @@ export default function CourseStudioView({
                     onClick={() => onSelectCourse(c)}
                     className={`p-4 rounded-2xl border cursor-pointer transition-all duration-200 ${
                       isSelected
-                        ? 'bg-sand-900 border-clay-500/60 shadow-xl shadow-sand-300/25'
+                        ? 'bg-sand-900 border-clay-500/60 shadow-xl shadow-sand-300/25 ring-1 ring-clay-500/30'
                         : 'bg-sand-900/40 border-sand-800/80 hover:bg-sand-900/80 hover:border-sand-700'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <div>
-                        <div className="flex items-center gap-1.5 mb-1">
+                        <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                           {isCustom ? (
                             <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-clay-500/20 text-clay-300 border border-clay-500/30">
                               Custom Ingested
@@ -531,38 +610,56 @@ export default function CourseStudioView({
                             }
                           }}
                           title="Delete course"
-                          className="p-1.5 text-sand-500 hover:text-clay-400 rounded-lg hover:bg-clay-950/30 transition"
+                          className="p-1.5 text-sand-500 hover:text-clay-400 rounded-lg hover:bg-clay-950/30 transition shrink-0"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-3 text-[11px] text-sand-400 pt-2 border-t border-sand-800/60 font-mono">
-                      <span>{c.chapters_count || c.chapters?.length || 1} Chapters</span>
-                      <span>•</span>
-                      <span>{c.flashcards_count || c.cards?.length || 0} Flashcards</span>
-                      <span>•</span>
-                      <span>{c.quizzes_count || c.quizzes?.length || 0} Quizzes</span>
+                    <div className="flex items-center justify-between text-[11px] text-sand-400 pt-2 border-t border-sand-800/60 font-mono">
+                      <div className="flex items-center gap-2">
+                        <span>{c.chapters_count || c.chapters?.length || 1} Ch</span>
+                        <span>•</span>
+                        <span>{c.flashcards_count || c.cards?.length || 0} Cards</span>
+                      </div>
+
+                      {/* Direct Study Action */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectCourse(c);
+                          onNavigateToStudy?.();
+                        }}
+                        className="text-[10px] text-clay-400 hover:text-clay-300 font-bold flex items-center gap-1"
+                      >
+                        Study <ChevronRight className="w-3 h-3" />
+                      </button>
                     </div>
                   </div>
                 );
               })}
+
+              {filteredCourses.length === 0 && (
+                <div className="p-8 text-center text-xs text-sand-500 font-mono">
+                  No courses matching "{courseSearchQuery}".
+                </div>
+              )}
             </div>
           </div>
 
           {/* Right Column: Active Course Chapter Breakdown */}
           <div className="lg:col-span-8">
             {activeCourse ? (
-              <div className="glass-panel p-6 rounded-2xl border border-sand-800 space-y-6">
+              <div className="glass-panel p-6 sm:p-7 rounded-2xl border border-sand-800 space-y-6 shadow-xl">
                 {/* Course Header Banner */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-sand-800">
                   <div>
                     <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-clay-400 block mb-1">
                       {activeCourse.is_builtin ? 'Standard Curriculum Repository' : 'Custom Ingested Course'}
                     </span>
-                    <h3 className="text-xl font-extrabold text-sand-50">{activeCourse.title}</h3>
-                    <p className="text-xs text-sand-400 mt-1">
+                    <h3 className="text-xl sm:text-2xl font-extrabold text-sand-50">{activeCourse.title}</h3>
+                    <p className="text-xs text-sand-400 mt-1 max-w-xl leading-relaxed">
                       {activeCourse.description || `Comprehensive learning module for ${activeCourse.title}.`}
                     </p>
                   </div>
@@ -570,15 +667,15 @@ export default function CourseStudioView({
                   {/* Navigation Shortcuts */}
                   <div className="flex items-center gap-2 shrink-0">
                     <button
-                      onClick={onNavigateToStudy}
-                      className="px-4 py-2 bg-gradient-to-r from-clay-600 to-amber-600 hover:from-clay-500 hover:to-amber-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-sand-300/25 transition flex items-center gap-1.5"
+                      onClick={() => onNavigateToStudy?.()}
+                      className="px-4 py-2 bg-gradient-to-r from-clay-600 to-amber-600 hover:from-clay-500 hover:to-amber-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-sand-300/25 transition flex items-center gap-1.5 active:scale-95"
                     >
                       <BookOpen className="w-3.5 h-3.5" />
-                      Study Flashcards
+                      Study Theory
                     </button>
                     <button
                       onClick={onNavigateToPractice}
-                      className="px-4 py-2 bg-sand-800 hover:bg-sand-700 text-sand-50 text-xs font-bold rounded-xl border border-sand-700 transition flex items-center gap-1.5"
+                      className="px-4 py-2 bg-sand-800 hover:bg-sand-700 text-sand-50 text-xs font-bold rounded-xl border border-sand-700 transition flex items-center gap-1.5 active:scale-95"
                     >
                       <BrainCircuit className="w-3.5 h-3.5 text-olive-400" />
                       Practice Lab
@@ -586,55 +683,151 @@ export default function CourseStudioView({
                   </div>
                 </div>
 
-                {/* Chapter Cards Grid */}
+                {/* Course Summary Metrics Bar */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-3.5 rounded-xl bg-sand-900/60 border border-sand-800">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-sand-400 block mb-0.5">Chapters</span>
+                    <span className="text-lg font-bold text-sand-50">{activeCourse.chapters?.length || activeCourse.chapters_count || 1}</span>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-sand-900/60 border border-sand-800">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-sand-400 block mb-0.5">Total Sections</span>
+                    <span className="text-lg font-bold text-sand-50">
+                      {activeCourse.chapters?.reduce((acc, ch) => acc + (ch.sections_count || ch.subsections?.length || 0), 0) || '---'}
+                    </span>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-sand-900/60 border border-sand-800">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-sand-400 block mb-0.5">Flashcards</span>
+                    <span className="text-lg font-bold text-sand-50">{activeCourse.flashcards_count || activeCourse.cards?.length || 0}</span>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-sand-900/60 border border-sand-800">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-sand-400 block mb-0.5">Quizzes & Exams</span>
+                    <span className="text-lg font-bold text-sand-50">{activeCourse.quizzes_count || activeCourse.quizzes?.length || 0}</span>
+                  </div>
+                </div>
+
+                {/* Chapter Cards Grid — grouped into study units when available */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-bold uppercase tracking-wider text-sand-300 flex items-center gap-2">
                       <Layers className="w-4 h-4 text-clay-400" />
                       Structured Theory Chapters ({activeCourse.chapters?.length || 1})
+                      {unitGroups.length > 1 && (
+                        <span className="text-sand-500 font-mono normal-case">
+                          · {unitGroups.length} study units
+                        </span>
+                      )}
                     </h4>
                   </div>
 
-                  <div className="space-y-3">
-                    {(activeCourse.chapters || []).map((ch, idx) => {
-                      const chIndex = ch.chapter_index || idx + 1;
-                      return (
-                        <div
-                          key={ch.chapter_id || idx}
-                          className="bg-sand-900/60 border border-sand-800 rounded-xl p-4 hover:border-sand-700 transition"
-                        >
-                          <div className="flex items-start justify-between gap-3 mb-2">
-                            <div className="flex items-center gap-2.5">
-                              <span className="w-6 h-6 rounded-lg bg-clay-500/20 text-clay-300 font-mono text-xs font-bold flex items-center justify-center border border-clay-500/30">
-                                {chIndex}
-                              </span>
-                              <h5 className="text-sm font-bold text-sand-50">{ch.title}</h5>
-                            </div>
-                            <span className="text-[10px] font-mono text-sand-400 bg-sand-950 px-2 py-0.5 rounded border border-sand-800">
-                              {(ch.cards || []).length} Flashcards
+                  <div className="space-y-6">
+                    {unitGroups.map((group, gi) => (
+                      <div key={group.unitIndex ?? `g${gi}`} className="space-y-3">
+                        {group.unitName && (
+                          <div className="flex items-center gap-3 pt-1">
+                            <span className="px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider bg-clay-500/15 text-clay-300 border border-clay-500/30 shrink-0">
+                              Unit {group.unitIndex}
+                            </span>
+                            <h5 className="text-sm font-bold text-sand-100 truncate">{group.unitName}</h5>
+                            <span className="flex-1 h-px bg-sand-800" />
+                            <span className="text-[10px] font-mono text-sand-500 shrink-0">
+                              {group.chapters.length} chapter{group.chapters.length === 1 ? '' : 's'}
                             </span>
                           </div>
+                        )}
 
-                          <p className="text-xs text-sand-300 leading-relaxed mb-3 pl-8">
-                            {ch.summary || 'Essential theoretical principles and governing relationships.'}
-                          </p>
+                        {group.chapters.map((ch, idx) => {
+                          const chIndex = ch.chapter_index || idx + 1;
+                          const sectionCount = ch.sections_count || ch.subsections?.length || 0;
+                          return (
+                            <div
+                              key={ch.chapter_id || chIndex}
+                              className="bg-sand-900/60 border border-sand-800 rounded-2xl p-4 sm:p-5 hover:border-sand-700 transition group"
+                            >
+                              <div className="flex items-start justify-between gap-3 mb-2.5">
+                                <div className="flex items-center gap-2.5">
+                                  <span className="w-6 h-6 rounded-lg bg-clay-500/20 text-clay-300 font-mono text-xs font-bold flex items-center justify-center border border-clay-500/30 shrink-0">
+                                    {chIndex}
+                                  </span>
+                                  <h5 className="text-sm font-bold text-sand-50 group-hover:text-clay-300 transition">{ch.title}</h5>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {ch.theory_source && (
+                                    <span
+                                      title={
+                                        ch.theory_source === 'llm'
+                                          ? 'Theory enriched by the fine-tuned local Llama model'
+                                          : 'Theory built offline from the source text'
+                                      }
+                                      className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                                        ch.theory_source === 'llm'
+                                          ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                                          : 'bg-olive-500/15 text-olive-300 border-olive-500/30'
+                                      }`}
+                                    >
+                                      {ch.theory_source === 'llm' ? 'Llama' : 'Offline'}
+                                    </span>
+                                  )}
+                                  {sectionCount > 0 && (
+                                    <span className="text-[10px] font-mono text-sand-400 bg-sand-950 px-2 py-0.5 rounded border border-sand-800">
+                                      {sectionCount} Sections
+                                    </span>
+                                  )}
+                                  <span className="text-[10px] font-mono text-sand-400 bg-sand-950 px-2 py-0.5 rounded border border-sand-800">
+                                    {(ch.cards || []).length} Cards
+                                  </span>
 
-                          {ch.objectives && ch.objectives.length > 0 && (
-                            <div className="pl-8 pt-2 border-t border-sand-800/60 flex flex-wrap gap-2">
-                              {ch.objectives.map((obj, oIdx) => (
-                                <span
-                                  key={oIdx}
-                                  className="text-[10px] bg-sand-950/80 text-sand-400 px-2.5 py-1 rounded-lg border border-sand-800/80 flex items-center gap-1.5"
-                                >
-                                  <Check className="w-3 h-3 text-olive-400 shrink-0" />
-                                  <span>{obj}</span>
-                                </span>
-                              ))}
+                                  {/* Direct chapter study trigger */}
+                                  <button
+                                    onClick={() => onNavigateToStudy?.(chIndex - 1)}
+                                    className="p-1 rounded-lg text-sand-400 hover:text-clay-300 hover:bg-sand-800 transition"
+                                    title="Open this chapter in Theory Explorer"
+                                  >
+                                    <ArrowRight className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              <p className="text-xs text-sand-300 leading-relaxed mb-3 pl-8">
+                                {ch.summary || 'Essential theoretical principles and governing relationships.'}
+                              </p>
+
+                              {ch.subsections?.length > 0 && (
+                                <div className="pl-8 pb-2 flex flex-wrap gap-1.5">
+                                  {ch.subsections.slice(0, 8).map((sub, sIdx) => (
+                                    <span
+                                      key={sub.section_id || sIdx}
+                                      title={sub.title}
+                                      className="text-[10px] font-mono text-sand-400 bg-sand-950/80 px-2 py-0.5 rounded border border-sand-800/70"
+                                    >
+                                      {sub.label || sIdx + 1}
+                                    </span>
+                                  ))}
+                                  {ch.subsections.length > 8 && (
+                                    <span className="text-[10px] font-mono text-sand-500 px-1 py-0.5">
+                                      +{ch.subsections.length - 8} more
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
+                              {ch.objectives && ch.objectives.length > 0 && (
+                                <div className="pl-8 pt-2.5 border-t border-sand-800/60 flex flex-wrap gap-2">
+                                  {ch.objectives.map((obj, oIdx) => (
+                                    <span
+                                      key={oIdx}
+                                      className="text-[10px] bg-sand-950/80 text-sand-400 px-2.5 py-1 rounded-lg border border-sand-800/80 flex items-center gap-1.5"
+                                    >
+                                      <Check className="w-3 h-3 text-olive-400 shrink-0" />
+                                      <span>{obj}</span>
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                          );
+                        })}
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>

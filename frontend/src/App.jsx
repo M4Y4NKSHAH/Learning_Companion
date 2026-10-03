@@ -1381,7 +1381,12 @@ export default function App() {
             onSelectCourse={handleSelectCustomCourse}
             onDeleteCourse={handleDeleteCourse}
             onCourseCreated={handleIngestionComplete}
-            onNavigateToStudy={() => setActiveView('theory')}
+            onNavigateToStudy={(chIdx) => {
+              if (typeof chIdx === 'number') {
+                setActiveChapterIndex(chIdx);
+              }
+              setActiveView('theory');
+            }}
             onNavigateToPractice={() => setActiveView('quiz')}
             activeColor={activeSubject === 'Biology' ? 'olive' : activeSubject === 'Mathematics' ? 'clay' : 'ember'}
           />

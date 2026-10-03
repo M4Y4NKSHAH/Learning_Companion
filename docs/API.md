@@ -11,6 +11,8 @@
 | --- | --- | --- |
 | POST | `/api/material/ingest` | Ingest raw text/notes/syllabus into structured chapters, flashcards & tests |
 | POST | `/api/material/upload` | Upload PDF, TXT, or Markdown document for automated course generation |
+| POST | `/api/material/course/{course_id}/enrich` | Resume or continue background LLM enrichment on skeletal course chapters |
+| GET | `/api/material/job/{job_id}/status` | Poll real-time progress for async ingestion or enrichment jobs |
 | GET | `/api/material/courses` | List all available standard and custom ingested courses |
 | GET | `/api/material/course/{course_id}` | Retrieve full course outline, chapters, objectives and assessment items |
 | DELETE | `/api/material/course/{course_id}` | Delete a user-created custom course |
@@ -241,9 +243,18 @@ tier-appropriate remediation hint (Level 1 Foundation → Level 4 Advanced Chall
 ## 7. Material Ingestion & Custom Course Endpoints
 
 ### `POST /api/material/upload`
-Uploads a document (PDF, TXT, MD, EPUB) and initiates parsing into structured chapters, flashcards, vector embeddings, and evaluation items.
+Uploads a document (PDF, TXT, MD, EPUB, MOBI) and initiates two-phase course generation: instant deterministic skeletal course creation followed by progressive LLM enrichment.
 
-- **Form Fields**: `file` (Binary), `title` (str), `subject` (str), `academic_tier` (str), `async_mode` (bool, default `true`).
+- **Form Fields**:
+  - `file`: Uploaded file (Binary, required)
+  - `title`: Course display title (string, optional)
+  - `subject`: Academic discipline (string, default `"General"`)
+  - `academic_tier`: `"Class 10"` | `"Class 11-12"` | `"Undergraduate"` (default `"Standard"`)
+  - `async_mode`: Whether to run background worker (bool, default `false`)
+  - `enrich_count`: Cap on chapters to enrich with local LLM (int, optional, e.g. `5` or `10`)
+  - `enrich_chapters`: Chapter selector expression (string, optional, e.g. `"1-5,7"`)
+  - `include_cards`: Whether LLM should generate flashcards (bool, default `true`)
+  - `resume`: When true, skips chapters already marked with `theory_source: "llm"` (bool, default `false`)
 - **Response (`async_mode: true`)**:
   ```json
   {
@@ -264,12 +275,37 @@ Ingests raw text, lecture notes, or syllabi directly via JSON.
     "subject": "Physics",
     "academic_tier": "Undergraduate",
     "raw_text": "...",
-    "async_mode": true
+    "async_mode": true,
+    "enrich_count": 5,
+    "include_cards": true,
+    "resume": false
+  }
+  ```
+
+### `POST /api/material/course/{course_id}/enrich`
+Resumes or continues partial build enrichment for an existing course in the background. Does not re-generate chapters already enriched (`theory_source == "llm"`). Re-publishes the course on disk after each enriched chapter.
+
+- **Request Body**:
+  ```json
+  {
+    "enrich_count": 10,
+    "enrich_chapters": "1-10",
+    "include_cards": true,
+    "resume": true
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "status": "processing",
+    "message": "Enrichment queued for course 'custom_phy_89a12c'.",
+    "job_id": "job_e9f1a2b3",
+    "course_id": "custom_phy_89a12c"
   }
   ```
 
 ### `GET /api/material/job/{job_id}/status`
-Polls real-time progress for background curriculum generation jobs.
+Polls real-time progress for background curriculum generation and enrichment jobs.
 
 - **Response**:
   ```json
@@ -280,7 +316,11 @@ Polls real-time progress for background curriculum generation jobs.
     "status": "processing",              // queued | processing | completed | failed
     "progress": 65,                      // 0 - 100 percentage
     "current_step": 3,                   // 1: Parsing | 2: Structuring | 3: Synthesizing | 4: Vectorizing | 5: Assessments
-    "current_message": "Synthesizing Chapter 2 of 4: Wave-Particle Duality...",
+    "current_message": "Enriched chapter 2 [2/5] | ~1.2 min left",
+    "chapters_enriched": 2,
+    "chapters_total": 14,
+    "eta_seconds": 72,
+    "avg_seconds_per_chapter": 24.1,
     "course": null                       // Populated with complete Course Record when status == 'completed'
   }
   ```

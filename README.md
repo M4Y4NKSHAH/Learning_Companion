@@ -61,6 +61,7 @@ Learning_Companion/
 ├── docs/                           # Comprehensive technical documentation
 │   ├── API.md                      # REST endpoint contracts & payload schemas
 │   ├── ARCHITECTURE.md             # System design, LangGraph state machine, data flows
+│   ├── BOOK_PROCESSING_SPEC.md     # Universal textbook parsing, heading inference & two-phase ingestion
 │   ├── DATA.md                     # Vector store schemas, OpenStax data pipelines
 │   ├── DESIGN.md                   # Japandi UI/UX design specifications & palette
 │   ├── LOCAL_MODEL_TRAINING_GUIDE.md # LoRA / Kaggle PEFT fine-tuning & Ollama guide
@@ -68,17 +69,21 @@ Learning_Companion/
 │   └── SETUP.md                    # Detailed developer onboarding & setup guide
 ├── backend/                        # Python backend service
 │   ├── app.py                      # FastAPI server & route handlers
+│   ├── book_structurer.py          # Document structure inference engine (TOC pruning, heading scoring)
+│   ├── divide_book.py              # Two-phase textbook dividing & publishing pipeline
 │   ├── pedagogical_guardrails.py   # Grade-level ceilings & off-topic information filter
 │   ├── tutor_graph.py              # LangGraph multi-agent cognitive graph
 │   ├── local_llm_service.py        # Local Ollama / Llama-3.2-3B offline service
 │   ├── database_ingest.py          # BM25 + ChromaDB hybrid RAG pipeline
 │   ├── course_manager.py           # Curriculum & custom course persistence
-│   ├── material_parser.py          # Algorithmic document cleaner & chapter slicer
-│   ├── question_generator.py       # Theory blueprint & quiz generation engine
+│   ├── material_parser.py          # Algorithmic document cleaner & document text extraction
+│   ├── question_generator.py       # Single-pass theory synthesis & quiz generation engine
 │   ├── fuzzy_engine.py             # Mamdani fuzzy evaluation engine
 │   ├── hint_utils.py               # Answer-leak sanitization & prompt guards
 │   ├── theory_repo.py              # Static curriculum banks & fallback theory
-│   ├── tests/                      # Dedicated automated test suites (20/20 passed)
+│   ├── tests/                      # Dedicated automated test suites (43/43 passed)
+│   │   ├── test_book_structurer.py        # Heading scoring, TOC pruning & layout tests
+│   │   ├── test_two_phase_ingestion.py    # Two-phase async ingestion & crash-recovery tests
 │   │   ├── test_pedagogical_guardrails.py # Grade ceiling & deflection tests
 │   │   ├── test_content_aware_qg.py       # Fact extraction & assessment tests
 │   │   ├── test_fuzzy_extended.py         # Comprehensive Mamdani test suite
@@ -88,11 +93,12 @@ Learning_Companion/
 │   └── data/                       # Textbooks, curriculum, and sample corpora
 ├── frontend/                       # React 18 + Vite + Tailwind CSS frontend
 │   ├── src/
-│   │   ├── components/             # Reusable UI modules (CourseStudio, TheoryExplorer, etc.)
+│   │   ├── components/             # Reusable UI modules (ChapterNav, CourseStudio, TheoryExplorer, etc.)
 │   │   ├── App.jsx                 # Main application view & glass-box telemetry HUD
 │   │   └── index.css               # Japandi theme tokens & styling
 │   └── package.json
 ├── training/                       # Fine-tuning artifacts & Llama-3.2-3B LoRA adapters
+│   ├── Modelfile                   # Optimized Ollama model specification (learning-companion)
 │   └── llama3.2-3b-edu-adapter/    # Extracted PEFT adapter weights (~97 MB)
 ├── requirements.txt                # Curated Python backend dependencies
 └── README.md
@@ -105,7 +111,14 @@ Learning_Companion/
 ### 1. Prerequisites
 - **Python:** 3.10+
 - **Node.js:** 18+ and npm
-- **Local Ollama (Optional for Offline Inference):** [Ollama](https://ollama.com) (`ollama pull llama3.2:3b`)
+- **Local Ollama (Offline Inference):** [Ollama](https://ollama.com)
+  ```bash
+  # Pull base Llama 3.2 3B model
+  ollama pull llama3.2:3b
+
+  # (Recommended) Build the optimized Learning Companion model
+  ollama create learning-companion -f training/Modelfile
+  ```
 - **API Key (Optional fallback):** Google Gemini API Key in `.env`:
   ```env
   GEMINI_API_KEY=your_gemini_api_key_here
@@ -138,13 +151,15 @@ npm run dev
 
 ## 🧪 Testing & Quality Assurance
 
-Run the complete automated test suite across all 20 unit and integration tests:
+Run the complete automated test suite across all 43 unit and integration tests:
 
 ```powershell
 pytest backend/tests/ -v
 ```
 
-All 20 tests verify:
+All 43 tests verify:
+- Universal book structure inference and TOC front-matter pruning (`test_book_structurer.py`).
+- Two-phase ingestion with instant skeleton publication and background enrichment (`test_two_phase_ingestion.py`).
 - Grade-level ceiling enforcement (Class 9 vs Class 12).
 - Off-topic deflection guardrails.
 - Primary course material grounding.
@@ -157,6 +172,7 @@ All 20 tests verify:
 ## 📚 Detailed Documentation
 
 - 🏛️ **[System Architecture](docs/ARCHITECTURE.md)**: LangGraph state machine, pedagogical guardrails, and hybrid retrieval.
+- 📖 **[Book Processing Specification](docs/BOOK_PROCESSING_SPEC.md)**: Universal layout inference, TOC deduplication, and two-phase course publisher.
 - 🔌 **[API Reference](docs/API.md)**: Request/response schemas for `/api/tutor/*` and `/api/material/*`.
 - 🎨 **[Design System](docs/DESIGN.md)**: Japandi aesthetics, color tokens, telemetry badges, and layout guidelines.
 - 🗄️ **[Knowledge Base & RAG](docs/DATA.md)**: ChromaDB vector collections, chunking, and deduplication.
@@ -168,3 +184,4 @@ All 20 tests verify:
 
 ## 📄 License
 Academic and research usage. See respective course material licenses for OpenStax text assets.
+

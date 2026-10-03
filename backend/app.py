@@ -1,8 +1,9 @@
 import os
 import sys
 import json
+import time
 import uuid
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from dotenv import load_dotenv
 
 # Ensure current backend directory is in sys.path for robust module resolution
@@ -38,6 +39,7 @@ from question_generator import QuestionGeneratorEngine
 from database_ingest import DatabaseIngestPipeline, get_db_pipeline
 from pedagogical_guardrails import filter_for_grade_level, normalize_academic_tier
 from local_llm_service import local_llm
+from divide_book import estimate_llm_build, parse_chapter_selection
 
 app = FastAPI(title="Unified Agentic Socratic Tutoring Platform")
 
@@ -60,6 +62,19 @@ class IngestMaterialPayload(BaseModel):
     raw_text: str = ""
     generate_questions_immediately: bool = True
     async_mode: bool = False
+    # Selective synthesis: e.g. enrich_count=10 on a 41-chapter book synthesizes
+    # LLM theory for the first 10 and the grounded skeleton for the rest.
+    enrich_count: Optional[int] = None
+    enrich_chapters: Optional[str] = None
+    include_cards: bool = True
+    resume: bool = False
+
+class EnrichCoursePayload(BaseModel):
+    """Asks a published course to enrich more chapters with the local Llama."""
+    enrich_count: Optional[int] = None          # e.g. 10 -> first 10 remaining
+    enrich_chapters: Optional[str] = None       # e.g. "11-20" or "1,3,5-8"
+    include_cards: bool = True
+    resume: bool = True                          # never redo already-enriched chapters
 
 class ChatSessionPayload(BaseModel):
     message: str
@@ -153,23 +168,91 @@ def _find_best_matching_chapter(target_title: str, raw_chapters: list[dict]) -> 
 
 
 # --- MATERIAL INGESTION & PIPELINE HELPER ---
+def _smart_divide_material(text: str, title: str, subject: str,
+                           academic_tier: str) -> list:
+    """Book-agnostic division of an uploaded document.
+
+    Infers this document's own chapter/section/unit layout (see
+    `book_structurer`) instead of assuming one publisher's format, so uploaded
+    PDFs, EPUB dumps, markdown notes and pasted text all divide correctly.
+    Returns [] when the structure pass cannot beat the simple parser, which
+    keeps the classic path available for very short material.
+    """
+    try:
+        from divide_book import SmartBookDivider
+        divider = SmartBookDivider(text=text, title=title, subject=subject,
+                                   tier=academic_tier)
+        if not divider.plan.chapter_matches or divider.plan.chapter_kind in ("none", "titled_caps"):
+            return []
+        chapters = divider.divide()
+    except Exception as exc:
+        print(f"[Ingestion] Smart division unavailable ({exc}); using simple detection.")
+        return []
+    if len(chapters) < 2:
+        return []
+    print(f"[Ingestion] Smart division found {len(chapters)} chapters "
+          f"via '{divider.plan.chapter_kind}' / sections '{divider.plan.section_kind}'.")
+    return chapters
+
+
+def _select_chapters_for_llm(raw_chapters: list, enrich_spec) -> set:
+    """Resolves which chapter numbers should get model-enriched theory.
+
+    A full-book Llama pass is ~25 s per chapter, so the caller can cap the work
+    (e.g. "10" out of 41). `None` means every chapter, which preserves the
+    original behaviour for API clients that do not send a selection;
+    `0` means no chapter — publish the grounded skeleton only.
+    """
+    if enrich_spec is not None:
+        if (isinstance(enrich_spec, int) and enrich_spec == 0) or \
+           (isinstance(enrich_spec, str) and enrich_spec.strip() == "0"):
+            return set()
+    available = [ch.get("chapter_index", i) for i, ch in enumerate(raw_chapters, 1)]
+    selected = parse_chapter_selection(enrich_spec, available)
+    targets = selected if selected is not None else available
+    return set(targets)
+
+
+def _theory_coverage(processed_chapters: list) -> dict:
+    """Which chapters are Llama-enriched, out of how many (learned by the UI)."""
+    enriched = [ch.get("chapter_index") for ch in processed_chapters
+                if ch.get("theory_source") == "llm"]
+    total = len(processed_chapters)
+    return {
+        "enriched_chapters": enriched,
+        "enriched_count": len(enriched),
+        "chapters_total": total,
+        "pending_count": max(0, total - len(enriched)),
+        "complete": total > 0 and len(enriched) >= total,
+    }
+
+
 def process_and_ingest_material(
     title: str,
     subject: str,
     academic_tier: str,
     raw_text: str,
     course_id: Optional[str] = None,
-    job_id: Optional[str] = None
+    job_id: Optional[str] = None,
+    enrich_count: Optional[int] = None,
+    enrich_chapters: Optional[str] = None,
+    include_cards: bool = True,
+    resume: bool = False
 ) -> dict:
     """
-    Enterprise Ingestion Pipeline:
-    1. Sanitizes input material.
-    2. Decomposes document dynamically into clean, non-overlapping instructional chapters.
-    3. Generates high-retention theory summaries and flashcards per chapter.
-    4. Vectors chunks into ChromaDB with course_id and chapter_id namespaces.
-    5. Synthesizes content-grounded quizzes and summative final exam questions.
-    6. Persists the complete course into local storage.
+    Enterprise Ingestion Pipeline — two-phase, so the learner never waits.
+
+    Phase A (seconds): sanitize, divide, build the source-grounded deterministic
+        theory for EVERY chapter, vectorize, and publish the course. It is
+        complete and studyable immediately — chapters, sections, summaries,
+        objectives and flashcards all exist.
+    Phase B (minutes, optional): enrich only the selected chapters with the local
+        Llama (`enrich_count` / `enrich_chapters`), re-publishing as each one
+        lands so an interrupted run keeps its work. `resume=True` skips chapters
+        that are already `theory_source == "llm"`.
+    Phase C: content-grounded quizzes and the summative final exam.
     """
+
     if job_id and job_id in INGESTION_JOBS:
         INGESTION_JOBS[job_id]["status"] = "processing"
         INGESTION_JOBS[job_id]["current_step"] = 1
@@ -185,8 +268,12 @@ def process_and_ingest_material(
     if detected_subject:
         subject = detected_subject
 
-    # 1. Detect / Decompose into chapters dynamically (unconstrained by book length or page count)
-    raw_chapters = MaterialParser.detect_outline_or_chapters(clean_text, max_chapters=None)
+    # 1. Detect / Decompose into chapters dynamically (any layout, any length).
+    # The smart divider infers this document's own heading style; the simple
+    # parser remains as the fallback for very short or structure-less material.
+    raw_chapters = _smart_divide_material(clean_text, title, subject, academic_tier)
+    if not raw_chapters:
+        raw_chapters = MaterialParser.detect_outline_or_chapters(clean_text, max_chapters=None)
     if not raw_chapters:
         raw_chapters = [{
             "chapter_index": 1,
@@ -211,31 +298,42 @@ def process_and_ingest_material(
         INGESTION_JOBS[job_id]["current_message"] = f"Structured {total_raw} instructional chapters for {subject}. Initializing synthesis..."
         INGESTION_JOBS[job_id]["progress"] = 25
 
+    spec = enrich_chapters if enrich_chapters is not None else enrich_count
+    llm_targets = _select_chapters_for_llm(raw_chapters, spec)
+    planned = len(llm_targets) if llm_targets else 0
+
     qge = QuestionGeneratorEngine()
     db_pipeline = get_db_pipeline()
 
     processed_chapters = []
     all_cards = []
-    print(f"[Ingestion] Processing {total_raw} detected chapters with strict chapter content isolation...")
+    print(f"[Ingestion] Phase A: building deterministic theory for all "
+          f"{total_raw} chapters (course openable immediately)...")
 
     for idx, ch in enumerate(raw_chapters, 1):
         ch_idx = ch.get("chapter_index", idx)
         ch_title = ch.get("title", f"Chapter {ch_idx}")
-        ch_content = ch.get("content", "")
-        ch_id = f"ch_{ch_idx}"
+        # Smart division emits `full_text` + structured `section_texts`; the
+        # classic parser emits `content`. Support both.
+        ch_content = ch.get("content") or ch.get("full_text", "")
+        ch_id = ch.get("chapter_id") or f"ch_{idx}"
 
         if job_id and job_id in INGESTION_JOBS:
             INGESTION_JOBS[job_id]["current_step"] = 3
-            INGESTION_JOBS[job_id]["current_message"] = f"Synthesizing Chapter {idx} of {total_raw}: {ch_title[:32]}..."
-            INGESTION_JOBS[job_id]["progress"] = int(25 + ((idx - 0.5) / max(1, total_raw)) * 40)
+            INGESTION_JOBS[job_id]["current_message"] = (
+                f"Structuring Chapter {idx} of {total_raw}: {ch_title[:32]}...")
+            INGESTION_JOBS[job_id]["progress"] = int(25 + ((idx - 0.5) / max(1, total_raw)) * 25)
 
-        # Synthesize chapter theory, objectives, and cards directly from this chapter's text
+        # Phase A is deliberately local/offline: every chapter gets the grounded
+        # deterministic skeleton in milliseconds, so the course is complete now.
         theory_data = qge.generate_chapter_theory_and_cards(
             chapter_title=ch_title,
             chapter_text=ch_content[:3500],
             subject=subject,
             tier=academic_tier,
-            chapter_index=ch_idx
+            chapter_index=ch_idx,
+            use_llm=False,
+            include_cards=include_cards,
         )
 
         ch_cards = theory_data.get("cards", [])
@@ -264,17 +362,116 @@ def process_and_ingest_material(
             "chapter_id": ch_id,
             "chapter_index": ch_idx,
             "title": ch_title,
+            "unit_index": ch.get("unit_index"),
+            "unit_name": ch.get("unit_name"),
             "summary": theory_data.get("summary", ""),
             "objectives": theory_data.get("objectives", []),
             "cards": ch_cards,
             "deep_theory": theory_data.get("deep_theory", {}),
             "subsections": ch.get("subsections", []),
+            "section_texts": ch.get("section_texts", []),
+            "sections_count": ch.get("sections_count", len(ch.get("section_texts", []))),
+            "toc_sections": ch.get("toc_sections", []),
+            "theory_source": theory_data.get("theory_source", "deterministic"),
             "full_text": ch_content,
             "content_preview": ch_content[:400] + "..." if len(ch_content) > 400 else ch_content
         })
 
-        if job_id and job_id in INGESTION_JOBS:
-            INGESTION_JOBS[job_id]["progress"] = int(25 + (idx / max(1, total_raw)) * 45)
+    # ---- Publish the complete skeleton course NOW: the learner can open it --- #
+    course_record = _assemble_course_record(
+        course_id, title, subject, academic_tier, processed_chapters,
+        all_cards, quizzes=[], final_exam=[], enriched_count=0)
+    _persist_course(course_record)
+    print(f"[Ingestion] [{course_id}] published with all {total_raw} chapters "
+          f"(grounded deterministic theory). Selective enrichment begins now.")
+
+    if job_id and job_id in INGESTION_JOBS:
+        INGESTION_JOBS[job_id]["current_step"] = 3
+        INGESTION_JOBS[job_id]["current_message"] = (
+            f"Course ready to study! Now enriching {planned}/{total_raw} "
+            f"chapter(s) with the local Llama..." if planned
+            else "Synthesizing quizzes & final exam...")
+        INGESTION_JOBS[job_id]["progress"] = 55
+        # Publish the coverage counters up-front so the UI can render a 0/N bar
+        # from the very first poll instead of waiting for chapter one to land.
+        if planned:
+            INGESTION_JOBS[job_id]["chapters_total"] = total_raw
+            INGESTION_JOBS[job_id]["chapters_enriched"] = 0
+            INGESTION_JOBS[job_id]["eta_seconds"] = None
+
+    # ---- Phase B: selective Llama enrichment with measured progress --------- #
+    if planned:
+        est = estimate_llm_build(planned)
+        print(f"[Ingestion] Phase B: enriching {planned} chapter(s) "
+              f"(~{est['minutes']} min at ~25 s/chapter), re-publishing each one "
+              f"so work is never lost.")
+        avg_seconds = None
+        enriched_now = 0
+        started_all = time.time()
+
+        for ch in processed_chapters:
+            num = ch["chapter_index"]
+            if llm_targets and num not in llm_targets:
+                continue
+            if resume and ch.get("theory_source") == "llm":
+                continue
+
+            start = time.time()
+            if job_id and job_id in INGESTION_JOBS:
+                INGESTION_JOBS[job_id]["current_message"] = (
+                    f"Enriching chapter {num} of {total_raw} "
+                    f"with the local Llama (gold-star theory)...")
+            theory_data = qge.generate_chapter_theory_and_cards(
+                chapter_title=ch["title"],
+                chapter_text=ch["full_text"][:9000],
+                subject=subject,
+                tier=academic_tier,
+                chapter_index=num,
+                use_llm=True,
+                include_cards=include_cards,
+                allow_cloud_fallback=False,
+            )
+            ch["summary"] = theory_data.get("summary", "")
+            ch["objectives"] = theory_data.get("objectives", [])
+            ch["cards"] = theory_data.get("cards", [])
+            ch["deep_theory"] = theory_data.get("deep_theory", {})
+            ch["theory_source"] = theory_data.get("theory_source", "deterministic")
+
+            all_cards = [c for chh in processed_chapters for c in chh.get("cards", [])]
+            enriched_now += 1
+            elapsed = time.time() - start
+            avg_seconds = (elapsed if avg_seconds is None
+                           else (avg_seconds * (enriched_now - 1) + elapsed) / enriched_now)
+            remaining = max(0, planned - enriched_now)
+            eta_sec = int(remaining * avg_seconds) if avg_seconds else None
+            eta_min = round(eta_sec / 60.0, 1) if eta_sec is not None else None
+            print(f"[Ingestion]   chapter {num} enriched [{enriched_now}/{planned}] "
+                  f"({avg_seconds:.1f}s/ch) -> re-published"
+                  + (f" | ~{eta_min} min left" if eta_min is not None else ""))
+
+            course_record["chapters"] = processed_chapters
+            course_record["cards"] = all_cards
+            course_record["flashcards_count"] = len(all_cards)
+            course_record["theory_coverage"] = _theory_coverage(processed_chapters)
+            _persist_course(course_record)
+
+            if job_id and job_id in INGESTION_JOBS:
+                INGESTION_JOBS[job_id]["chapters_enriched"] = enriched_now
+                INGESTION_JOBS[job_id]["eta_seconds"] = eta_sec
+                INGESTION_JOBS[job_id]["avg_seconds_per_chapter"] = round(avg_seconds, 1)
+                INGESTION_JOBS[job_id]["progress"] = int(55 + (enriched_now / max(1, planned)) * 30)
+
+        if enriched_now == 0:
+            warning = (
+                "No chapter could be enriched locally — every chapter keeps its "
+                "grounded deterministic theory. Verify Ollama is running "
+                "(`ollama serve`) and that a model is registered (`ollama list`).")
+            print(f"[Ingestion] WARNING: {warning}")
+            if job_id and job_id in INGESTION_JOBS:
+                INGESTION_JOBS[job_id]["current_message"] = warning
+    else:
+        print("[Ingestion] Selective enrichment is disabled for this run; every "
+              "chapter keeps the grounded deterministic skeleton.")
 
     # 3. Generate Content-Aware Assessment Items
     if job_id and job_id in INGESTION_JOBS:
@@ -292,34 +489,83 @@ def process_and_ingest_material(
     quizzes = assessment.get("quizzes", [])
     final_exam = assessment.get("finalExam", [])
 
-    # 4. Assemble and persist course
-    course_record = {
+    # 4. Final assemble and persist (assessments + coverage + counts)
+    course_record = _assemble_course_record(
+        course_id, title, subject, academic_tier, processed_chapters,
+        all_cards, quizzes=quizzes, final_exam=final_exam,
+        enriched_count=_theory_coverage(processed_chapters)["enriched_count"])
+    _persist_course(course_record)
+
+    if job_id and job_id in INGESTION_JOBS:
+        INGESTION_JOBS[job_id]["status"] = "completed"
+        INGESTION_JOBS[job_id]["current_step"] = 5
+        final_coverage = _theory_coverage(processed_chapters)
+        INGESTION_JOBS[job_id]["current_message"] = (
+            f"Course generated successfully! {final_coverage['enriched_count']}/"
+            f"{final_coverage['chapters_total']} chapters carry Llama theory; "
+            f"the rest use grounded deterministic theory.")
+        INGESTION_JOBS[job_id]["progress"] = 100
+        INGESTION_JOBS[job_id]["chapters_enriched"] = final_coverage["enriched_count"]
+        INGESTION_JOBS[job_id]["chapters_total"] = final_coverage["chapters_total"]
+        INGESTION_JOBS[job_id]["eta_seconds"] = 0
+        INGESTION_JOBS[job_id]["course"] = course_record
+
+    return course_record
+
+
+def _assemble_course_record(course_id: str, title: str, subject: str,
+                            academic_tier: str, processed_chapters: list,
+                            all_cards: list, quizzes: Optional[list] = None,
+                            final_exam: Optional[list] = None,
+                            enriched_count: int = 0) -> dict:
+    """Builds the persisted course envelope; reused for every progressive save."""
+    units: List[Dict[str, Any]] = []
+    for ch in processed_chapters:
+        unit_idx = ch.get("unit_index")
+        if unit_idx is None:
+            continue
+        if not any(u["unit_index"] == unit_idx for u in units):
+            units.append({"unit_index": unit_idx,
+                          "unit_name": ch.get("unit_name") or f"Unit {unit_idx}"})
+    total = len(processed_chapters)
+    return {
         "course_id": course_id,
         "title": title,
         "subject": subject,
         "academic_tier": academic_tier,
         "is_builtin": False,
-        "description": f"Custom ingested curriculum for {title}.",
+        "description": (f"Custom ingested curriculum for {title}. "
+                        f"Llama-enriched chapters: {enriched_count}/{total}."),
+        "theory_coverage": {
+            "enriched_chapters": [ch.get("chapter_index") for ch in processed_chapters
+                                  if ch.get("theory_source") == "llm"],
+            "enriched_count": enriched_count,
+            "chapters_total": total,
+            "pending_count": max(0, total - enriched_count),
+            "complete": total > 0 and enriched_count >= total,
+        },
         "chapters_count": len(processed_chapters),
+        "sections_count": sum(ch.get("sections_count", 0) for ch in processed_chapters),
+        "unit_count": len(units),
+        "units": sorted(units, key=lambda u: u["unit_index"]),
         "flashcards_count": len(all_cards),
-        "quizzes_count": len(quizzes),
-        "exam_questions_count": len(final_exam),
+        "quizzes_count": len(quizzes or []),
+        "exam_questions_count": len(final_exam or []),
         "chapters": processed_chapters,
         "cards": all_cards,
-        "quizzes": quizzes,
-        "finalExam": final_exam
+        "quizzes": quizzes or [],
+        "finalExam": final_exam or [],
     }
 
-    CourseManager.save_custom_course(course_record)
 
-    if job_id and job_id in INGESTION_JOBS:
-        INGESTION_JOBS[job_id]["status"] = "completed"
-        INGESTION_JOBS[job_id]["current_step"] = 5
-        INGESTION_JOBS[job_id]["current_message"] = "Course generated successfully!"
-        INGESTION_JOBS[job_id]["progress"] = 100
-        INGESTION_JOBS[job_id]["course"] = course_record
-
-    return course_record
+def _persist_course(course_record: dict) -> str:
+    """Writes the course JSON; full-text is capped for payload hygiene."""
+    try:
+        from divide_book import slim_course_source_text
+        slim_course_source_text(course_record)
+    except Exception:
+        pass
+    return CourseManager.save_custom_course(course_record)
 
 
 def _async_ingest_worker(
@@ -328,7 +574,11 @@ def _async_ingest_worker(
     subject: str,
     academic_tier: str,
     raw_text: str,
-    course_id: str
+    course_id: str,
+    enrich_count: Optional[int] = None,
+    enrich_chapters: Optional[str] = None,
+    include_cards: bool = True,
+    resume: bool = False
 ):
     """Background worker executing dynamic ingestion without blocking web responses."""
     try:
@@ -338,7 +588,11 @@ def _async_ingest_worker(
             academic_tier=academic_tier,
             raw_text=raw_text,
             course_id=course_id,
-            job_id=job_id
+            job_id=job_id,
+            enrich_count=enrich_count,
+            enrich_chapters=enrich_chapters,
+            include_cards=include_cards,
+            resume=resume
         )
     except Exception as e:
         print(f"[Async Ingestion Worker] Error processing {title}: {e}")
@@ -381,7 +635,11 @@ async def ingest_material_json(payload: IngestMaterialPayload, background_tasks:
                 subject=effective_subject,
                 academic_tier=payload.academic_tier,
                 raw_text=payload.raw_text,
-                course_id=course_id
+                course_id=course_id,
+                enrich_count=payload.enrich_count,
+                enrich_chapters=payload.enrich_chapters,
+                include_cards=payload.include_cards,
+                resume=payload.resume
             )
             return {
                 "status": "processing",
@@ -395,7 +653,11 @@ async def ingest_material_json(payload: IngestMaterialPayload, background_tasks:
             subject=effective_subject,
             academic_tier=payload.academic_tier,
             raw_text=payload.raw_text,
-            course_id=course_id
+            course_id=course_id,
+            enrich_count=payload.enrich_count,
+            enrich_chapters=payload.enrich_chapters,
+            include_cards=payload.include_cards,
+            resume=payload.resume
         )
         return {
             "status": "success",
@@ -415,9 +677,18 @@ async def upload_material_file(
     subject: Optional[str] = Form("General"),
     academic_tier: Optional[str] = Form("Standard"),
     async_mode: Optional[bool] = Form(False),
+    enrich_count: Optional[int] = Form(None),
+    enrich_chapters: Optional[str] = Form(None),
+    include_cards: Optional[bool] = Form(True),
+    resume: Optional[bool] = Form(False),
     background_tasks: BackgroundTasks = BackgroundTasks()
 ):
-    """API endpoint to upload PDF, TXT, or Markdown documents with instant async or sync processing."""
+    """API endpoint to upload PDF, TXT, or Markdown documents.
+
+    `enrich_count`/`enrich_chapters` let the learner cap the Llama phase
+    (e.g. 10 out of 41 chapters); everything else is published immediately with
+    the grounded deterministic skeleton and re-published as chapters land.
+    """
     try:
         contents = await file.read()
         filename = (file.filename or "uploaded_document").lower()
@@ -455,7 +726,11 @@ async def upload_material_file(
                 subject=effective_subject,
                 academic_tier=academic_tier or "Standard",
                 raw_text=extracted_text,
-                course_id=course_id
+                course_id=course_id,
+                enrich_count=enrich_count,
+                enrich_chapters=enrich_chapters,
+                include_cards=include_cards if include_cards is not None else True,
+                resume=resume if resume is not None else False
             )
             return {
                 "status": "processing",
@@ -469,7 +744,11 @@ async def upload_material_file(
             subject=subject or "General",
             academic_tier=academic_tier or "Standard",
             raw_text=extracted_text,
-            course_id=course_id
+            course_id=course_id,
+            enrich_count=enrich_count,
+            enrich_chapters=enrich_chapters,
+            include_cards=include_cards if include_cards is not None else True,
+            resume=resume if resume is not None else False
         )
         return {
             "status": "success",
@@ -481,6 +760,150 @@ async def upload_material_file(
     except Exception as e:
         print(f"File upload error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to process uploaded file: {str(e)}")
+
+
+def _async_enrich_worker(job_id: str, course_id: str,
+                         enrich_count: Optional[int] = None,
+                         enrich_chapters: Optional[str] = None,
+                         include_cards: bool = True,
+                         resume: bool = True):
+    """Enriches more chapters of an existing course, re-publishing each one."""
+    try:
+        qge = QuestionGeneratorEngine()
+        course = CourseManager.get_course_by_id(course_id)
+        if not course:
+            raise HTTPException(status_code=404, detail="Course not found.")
+        chapters = course.get("chapters", [])
+        if not chapters:
+            raise ValueError("Course has no chapters to enrich.")
+
+        spec = enrich_chapters if enrich_chapters is not None else enrich_count
+        llm_targets = _select_chapters_for_llm(chapters, spec)
+        if resume:
+            llm_targets = {n for n in llm_targets
+                           if n not in {c.get("chapter_index") for c in chapters
+                                        if c.get("theory_source") == "llm"}}
+        already_enriched = sum(1 for c in chapters
+                               if c.get("theory_source") == "llm")
+        planned = len(llm_targets)
+        if not planned:
+            if job_id in INGESTION_JOBS:
+                INGESTION_JOBS[job_id]["status"] = "completed"
+                INGESTION_JOBS[job_id]["current_message"] = "Nothing left to enrich."
+                INGESTION_JOBS[job_id]["progress"] = 100
+            return
+
+        est = estimate_llm_build(planned)
+        if job_id in INGESTION_JOBS:
+            INGESTION_JOBS[job_id]["total_chapters"] = len(chapters)
+            INGESTION_JOBS[job_id]["chapters_planned"] = planned
+            INGESTION_JOBS[job_id]["chapters_total"] = len(chapters)
+            INGESTION_JOBS[job_id]["chapters_enriched"] = already_enriched
+            INGESTION_JOBS[job_id]["current_message"] = (
+                f"Enriching {planned} more chapter(s) (~{est['minutes']} min)...")
+            INGESTION_JOBS[job_id]["progress"] = 15
+
+        all_cards = [c for chh in chapters for c in chh.get("cards", [])]
+        avg_seconds = None
+        done = 0
+        coverage = {}
+        subject = course.get("subject", "General")
+        tier = course.get("academic_tier", "Undergraduate")
+
+        for ch in chapters:
+            num = ch.get("chapter_index")
+            if num not in llm_targets:
+                continue
+            started = time.time()
+            theory = qge.generate_chapter_theory_and_cards(
+                chapter_title=ch.get("title", f"Chapter {num}"),
+                chapter_text=ch.get("full_text", "")[:9000],
+                subject=subject,
+                tier=tier,
+                chapter_index=num,
+                use_llm=True,
+                include_cards=include_cards,
+                allow_cloud_fallback=False,
+            )
+            ch["summary"] = theory.get("summary", "")
+            ch["objectives"] = theory.get("objectives", [])
+            ch["cards"] = theory.get("cards", [])
+            ch["deep_theory"] = theory.get("deep_theory", {})
+            ch["theory_source"] = theory.get("theory_source", "deterministic")
+            all_cards = [c for chh in chapters for c in chh.get("cards", [])]
+
+            done += 1
+            elapsed = time.time() - started
+            avg_seconds = (elapsed if avg_seconds is None
+                           else (avg_seconds * (done - 1) + elapsed) / done)
+            remaining = max(0, planned - done)
+            eta_sec = int(remaining * avg_seconds) if avg_seconds else None
+
+            course["chapters"] = chapters
+            course["cards"] = all_cards
+            course["flashcards_count"] = len(all_cards)
+            coverage = _theory_coverage(chapters)
+            course["theory_coverage"] = coverage
+            _persist_course(course)
+
+            if job_id in INGESTION_JOBS:
+                INGESTION_JOBS[job_id]["chapters_enriched"] = already_enriched + done
+                INGESTION_JOBS[job_id]["eta_seconds"] = eta_sec
+                INGESTION_JOBS[job_id]["avg_seconds_per_chapter"] = (
+                    round(avg_seconds, 1) if avg_seconds else None)
+                INGESTION_JOBS[job_id]["current_message"] = (
+                    f"Enriched chapter {num} [{done}/{planned}]"
+                    + (f" | ~{round(eta_sec / 60, 1)} min left" if eta_sec else ""))
+                INGESTION_JOBS[job_id]["progress"] = int(15 + (done / max(1, planned)) * 80)
+            print(f"[Enrich] planned {planned} -> done {done}: chapter {num} ({course_id})")
+
+        if job_id in INGESTION_JOBS:
+            INGESTION_JOBS[job_id]["status"] = "completed"
+            INGESTION_JOBS[job_id]["current_step"] = 5
+            INGESTION_JOBS[job_id]["current_message"] = (
+                f"Enrichment complete — {coverage['enriched_count']}/"
+                f"{coverage['chapters_total']} chapters now have Llama theory.")
+            INGESTION_JOBS[job_id]["progress"] = 100
+            INGESTION_JOBS[job_id]["chapters_enriched"] = coverage["enriched_count"]
+            INGESTION_JOBS[job_id]["chapters_total"] = coverage["chapters_total"]
+            INGESTION_JOBS[job_id]["eta_seconds"] = 0
+            INGESTION_JOBS[job_id]["course"] = course
+    except Exception as e:
+        print(f"[Async Enrich Worker] Error enriching {course_id}: {e}")
+        if job_id in INGESTION_JOBS:
+            INGESTION_JOBS[job_id]["status"] = "failed"
+            INGESTION_JOBS[job_id]["error"] = str(e)
+
+@app.post("/api/material/course/{course_id}/enrich")
+async def enrich_more_chapters(course_id: str, payload: EnrichCoursePayload,
+                               background_tasks: BackgroundTasks):
+    """Continue a partial build: enrich more chapters in the background.
+
+    Always resumes (never redoes `theory_source == "llm"` chapters) and
+    re-publishes the course as each enriched chapter lands, so the learner can
+    watch a 10/41 course become 20/41 live. Poll /api/material/job/{id}/status.
+    """
+    job_id = f"job_{uuid.uuid4().hex[:8]}"
+    INGESTION_JOBS[job_id] = {
+        "job_id": job_id,
+        "course_id": course_id,
+        "status": "queued",
+        "progress": 0,
+        "error": None,
+    }
+    background_tasks.add_task(
+        _async_enrich_worker,
+        job_id=job_id,
+        course_id=course_id,
+        enrich_count=payload.enrich_count,
+        enrich_chapters=payload.enrich_chapters,
+        include_cards=payload.include_cards,
+        resume=payload.resume,
+    )
+    return {"status": "processing",
+            "message": f"Enrichment queued for course '{course_id}'.",
+            "job_id": job_id, "course_id": course_id}
+
 
 @app.get("/api/material/job/{job_id}/status")
 async def get_ingestion_job_status(job_id: str):

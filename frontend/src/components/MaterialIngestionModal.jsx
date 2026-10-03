@@ -19,6 +19,16 @@ import {
 const SUBJECT_OPTIONS = ['Physics', 'Biology', 'Mathematics', 'Computer Science', 'General Science', 'Engineering'];
 const TIER_OPTIONS = ['Class 10', 'Class 11-12', 'Undergraduate', 'Graduate', 'Professional'];
 
+// Human-friendly "≈ 3 min 20 s" for the enrichment ETA surfaced by the backend.
+const formatDuration = (seconds) => {
+  const total = Math.max(0, Math.round(Number(seconds) || 0));
+  const mins = Math.floor(total / 60);
+  const secs = total % 60;
+  if (mins <= 0) return `${secs}s`;
+  if (secs === 0) return `${mins} min`;
+  return `${mins} min ${secs}s`;
+};
+
 export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuccess }) {
   const [activeTab, setActiveTab] = useState('upload'); // 'upload' | 'text'
   const [title, setTitle] = useState('');
@@ -26,6 +36,13 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
   const [tier, setTier] = useState('Undergraduate');
   const [rawText, setRawText] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
+  // Synthesis plan: a full 41-chapter book takes ~15+ minutes of Llama time, so
+  // the learner picks how much to synthesize now; the rest of the course is
+  // published instantly with the grounded deterministic skeleton and can be
+  // enriched later (resume).
+  const [synthesisPlan, setSynthesisPlan] = useState('quick'); // quick | full | custom | skeleton
+  const [customEnrichCount, setCustomEnrichCount] = useState(12);
+  const [enrichProgress, setEnrichProgress] = useState(null); // live {enriched,total,eta} from job
   
   // Pipeline status
   const [isProcessing, setIsProcessing] = useState(false);
@@ -74,7 +91,17 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
     };
   }, [isProcessing]);
 
-  const pollJobStatus = (jobId) => {
+  const getEnrichCount = () => {
+    if (synthesisPlan === 'skeleton') return 0;
+    if (synthesisPlan === 'full') return null;
+    if (synthesisPlan === 'custom') {
+      const n = parseInt(customEnrichCount, 10);
+      return (Number.isNaN(n) || n <= 0) ? null : n;
+    }
+    return 10; // 'quick': the first 10 chapters
+  };
+
+    const pollJobStatus = (jobId) => {
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
 
     pollIntervalRef.current = setInterval(async () => {
@@ -88,6 +115,14 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
           if (job.current_step) setProcessingStep(job.current_step);
           if (job.current_message) setStatusMessage(job.current_message);
           if (typeof job.progress === 'number') setProgressPercent(job.progress);
+          if (typeof job.chapters_total === 'number' || typeof job.chapters_enriched === 'number') {
+            setEnrichProgress({
+              total: job.chapters_total || 0,
+              enriched: job.chapters_enriched || 0,
+              eta: job.eta_seconds || null,
+              avg: job.avg_seconds_per_chapter || null,
+            });
+          }
         } else if (job.status === 'completed') {
           clearInterval(pollIntervalRef.current);
           pollIntervalRef.current = null;
@@ -179,23 +214,28 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
         formData.append('subject', subject);
         formData.append('academic_tier', tier);
         formData.append('async_mode', 'true');
+        const enrichCount = getEnrichCount();
+        if (enrichCount !== null) formData.append('enrich_count', String(enrichCount));
 
         response = await fetch('http://127.0.0.1:8000/api/material/upload', {
           method: 'POST',
           body: formData,
         });
       } else {
+        const body = {
+          title,
+          subject,
+          academic_tier: tier,
+          raw_text: rawText,
+          async_mode: true,
+          generate_questions_immediately: true,
+        };
+        const enrichCount = getEnrichCount();
+        if (enrichCount !== null) body.enrich_count = enrichCount;
         response = await fetch('http://127.0.0.1:8000/api/material/ingest', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title,
-            subject,
-            academic_tier: tier,
-            raw_text: rawText,
-            async_mode: true,
-            generate_questions_immediately: true,
-          }),
+          body: JSON.stringify(body),
         });
       }
 
@@ -313,7 +353,39 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
                 </span>
               </div>
 
-              {/* Live Progress Bar */}
+              {/* Deep-theory coverage (Phase B): the course is already usable
+                  while these chapters upgrade from grounded skeleton to Llama */}
+              {enrichProgress && enrichProgress.total > 0 && (
+                <div className="w-full max-w-md mb-5 px-3.5 py-2.5 rounded-xl bg-sand-950 border border-sand-800 text-left">
+                  <div className="flex items-center justify-between text-[10px] font-mono text-sand-400 mb-1.5">
+                    <span className="flex items-center gap-1.5">
+                      <BookOpen className="w-3 h-3 text-clay-400" />
+                      Deep-theory chapters
+                    </span>
+                    <span className="font-bold text-olive-400">
+                      {enrichProgress.enriched}/{enrichProgress.total}
+                    </span>
+                  </div>
+                  <div className="w-full bg-sand-900 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-olive-500 to-clay-500 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(100, Math.round((enrichProgress.enriched / Math.max(1, enrichProgress.total)) * 100))}%` }}
+                    />
+                  </div>
+                  <div className="mt-1.5 text-[10px] text-sand-500 font-mono">
+                    {enrichProgress.enriched === 0
+                      ? 'Publishing grounded theory for every chapter first…'
+                      : enrichProgress.enriched >= enrichProgress.total
+                        ? `✓ All ${enrichProgress.total} chapters now carry deep theory`
+                        : `✓ All chapters published — upgrading ${enrichProgress.enriched} of ${enrichProgress.total}`}
+                    {enrichProgress.enriched < enrichProgress.total && enrichProgress.eta
+                      ? ` · ≈ ${formatDuration(enrichProgress.eta)} left`
+                      : enrichProgress.enriched < enrichProgress.total && enrichProgress.avg
+                        ? ` · ${enrichProgress.avg}s/chapter`
+                        : ''}
+                  </div>
+                </div>
+              )}
               <div className="w-full max-w-md mb-5">
                 <div className="flex justify-between items-center text-[10px] font-mono text-sand-400 mb-1 px-1">
                   <span>Pipeline Progress</span>
@@ -520,6 +592,67 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
                   <div className="text-right text-[10px] text-sand-500 mt-1">{rawText.length} characters</div>
                 </div>
               )}
+
+              {/* Synthesis Plan: how much of the book to enrich with the local Llama */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 border border-sand-800/70 rounded-xl p-3 bg-sand-950/60">
+                <div className="md:col-span-2">
+                  <label className="block text-[11px] font-medium uppercase tracking-wider text-sand-400 mb-1">
+                    Synthesis Plan — how many chapters to generate now
+                  </label>
+                  <p className="text-[10px] text-sand-500 leading-relaxed">
+                    The whole book is published instantly with grounded theory for every
+                    chapter. This plan chooses how many get the deep local-Llama treatment
+                    now (≈25 s each). You can enrich more any time afterwards.
+                  </p>
+                </div>
+                {[
+                  { key: 'quick', label: '⚡ Quick start', desc: 'First 10 chapters' },
+                  { key: 'full', label: 'Full book', desc: 'Everything, patience required' },
+                  { key: 'custom', label: 'Custom count', desc: 'You pick how many' },
+                  { key: 'skeleton', label: 'Structure only', desc: 'Instant, no Llama yet' },
+                ].map((plan) => (
+                  <button
+                    key={plan.key}
+                    type="button"
+                    onClick={() => setSynthesisPlan(plan.key)}
+                    className={`flex-1 text-left px-3 py-2.5 rounded-lg border transition ${
+                      synthesisPlan === plan.key
+                        ? 'border-clay-500/60 bg-clay-600/15 text-sand-100 shadow-sm'
+                        : 'border-sand-800 bg-sand-950 text-sand-400 hover:border-sand-700'
+                    }`}
+                  >
+                    <div className="text-[11px] font-bold">{plan.label}</div>
+                    <div className="text-[9.5px] text-sand-500 mt-0.5">{plan.desc}</div>
+                  </button>
+                ))}
+                {synthesisPlan === 'custom' && (
+                  <div className="flex items-center gap-2 md:col-span-2">
+                    <span className="text-[11px] text-sand-400">Synthesize first</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={200}
+                      value={customEnrichCount}
+                      onChange={(e) => setCustomEnrichCount(e.target.value)}
+                      className="w-20 bg-sand-950 border border-sand-800 rounded-lg px-2.5 py-1.5 text-xs text-sand-50 focus:outline-none focus:border-clay-500"
+                    />
+                    <span className="text-[11px] text-sand-400">chapters
+                      {(() => {
+                        const n = parseInt(customEnrichCount, 10);
+                        const mins = Number.isNaN(n) || n <= 0 ? 0 : Math.max(1, Math.round(n * 25 / 60));
+                        return <em className="text-olive-400">(≈ {mins} min)</em>;
+                      })()}
+                    </span>
+                  </div>
+                )}
+                {synthesisPlan !== 'custom' && synthesisPlan !== 'skeleton' && (
+                  <div className="md:col-span-2 text-[10px] text-sand-500">
+                    {synthesisPlan === 'quick'
+                      ? 'Typical wait: ~4 min. The other chapters keep instant grounded theory and can be enriched later.'
+                      : 'Typical wait for a 41-chapter book: ~17 min. Consider Quick start for faster access.'}
+                  </div>
+                )}
+              </div>
 
               {/* Action Buttons */}
               <div className="flex justify-end gap-3 pt-2">
