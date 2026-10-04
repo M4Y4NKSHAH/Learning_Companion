@@ -35,7 +35,7 @@ from hint_utils import sanitize_gap_analysis, sanitize_hint_text, HINT_FORMAT_DI
 from spaced_repetition import SpacedRepetitionManager
 from material_parser import MaterialParser
 from course_manager import CourseManager
-from question_generator import QuestionGeneratorEngine
+from question_generator import QuestionGeneratorEngine, normalize_ai_content
 from database_ingest import DatabaseIngestPipeline, get_db_pipeline
 from pedagogical_guardrails import filter_for_grade_level, normalize_academic_tier
 from local_llm_service import local_llm
@@ -439,13 +439,13 @@ def process_and_ingest_material(
                     f"with the local Llama (gold-star theory)...")
             theory_data = qge.generate_chapter_theory_and_cards(
                 chapter_title=ch["title"],
-                chapter_text=ch["full_text"][:9000],
+                chapter_text=ch["full_text"][:30000],
                 subject=subject,
                 tier=academic_tier,
                 chapter_index=num,
                 use_llm=True,
                 include_cards=include_cards,
-                allow_cloud_fallback=False,
+                allow_cloud_fallback=bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")),
             )
             ch["summary"] = theory_data.get("summary", "")
             ch["objectives"] = theory_data.get("objectives", [])
@@ -848,13 +848,13 @@ def _async_enrich_worker(job_id: str, course_id: str,
             started = time.time()
             theory = qge.generate_chapter_theory_and_cards(
                 chapter_title=ch.get("title", f"Chapter {num}"),
-                chapter_text=ch.get("full_text", "")[:9000],
+                chapter_text=ch.get("full_text", "")[:30000],
                 subject=subject,
                 tier=tier,
                 chapter_index=num,
                 use_llm=True,
                 include_cards=include_cards,
-                allow_cloud_fallback=False,
+                allow_cloud_fallback=bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")),
             )
             ch["summary"] = theory.get("summary", "")
             ch["objectives"] = theory.get("objectives", [])
@@ -981,6 +981,107 @@ async def delete_custom_course(course_id: str):
         print(f"[Course Cleanup] Warning deleting vector chunks: {e}")
 
     return {"status": "success", "message": f"Course '{course_id}' and associated vector embeddings deleted."}
+
+
+class ReEnrichRequestPayload(BaseModel):
+    chapter_index: Optional[int] = None
+    use_llm: bool = True
+
+
+@app.post("/api/material/course/{course_id}/re-enrich")
+@app.post("/api/courses/{course_id}/re-enrich")
+async def re_enrich_course(course_id: str, payload: Optional[ReEnrichRequestPayload] = None):
+    course = CourseManager.get_course_by_id(course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail=f"Course '{course_id}' not found.")
+
+    target_idx = payload.chapter_index if payload else None
+    use_llm = payload.use_llm if payload is not None else True
+    allow_cloud = bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
+
+    qge = QuestionGeneratorEngine()
+    subject = course.get("subject", "Mathematics")
+    tier = course.get("academic_tier", "Standard")
+    chapters = course.get("chapters", [])
+
+    # Check for underlying curriculum source text
+    source_text = ""
+    title_lower = course.get("title", "").lower()
+    curr_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "curriculum")
+    if "calculus" in title_lower or "calculus" in course_id.lower():
+        p = os.path.join(curr_dir, "calculus_textbook.txt")
+        if os.path.exists(p):
+            with open(p, "r", encoding="utf-8", errors="replace") as fh:
+                source_text = fh.read()
+    elif "algebra" in title_lower or "math" in title_lower or "math" in course_id.lower():
+        p = os.path.join(curr_dir, "math_textbook.txt")
+        if os.path.exists(p):
+            with open(p, "r", encoding="utf-8", errors="replace") as fh:
+                source_text = fh.read()
+    elif "physics" in title_lower or "phys" in title_lower or "phy" in course_id.lower():
+        p = os.path.join(curr_dir, "physics_textbook.txt")
+        if os.path.exists(p):
+            with open(p, "r", encoding="utf-8", errors="replace") as fh:
+                source_text = fh.read()
+    elif "bio" in title_lower or "bio" in course_id.lower():
+        p = os.path.join(curr_dir, "biology_textbook.txt")
+        if os.path.exists(p):
+            with open(p, "r", encoding="utf-8", errors="replace") as fh:
+                source_text = fh.read()
+
+    canonical_chapters = {}
+    if source_text:
+        try:
+            from divide_book import SmartBookDivider
+            divider = SmartBookDivider({"text": source_text, "title": course.get("title", "Course"), "subject": subject, "tier": tier})
+            divider.divide()
+            for c in divider.chapters:
+                canonical_chapters[c.get("chapter_index")] = c
+        except Exception as de:
+            print(f"[re-enrich] Divider notice: {de}")
+
+    enriched_chapters = []
+    for ch in chapters:
+        c_idx = ch.get("chapter_index")
+        if target_idx is not None and c_idx != target_idx:
+            continue
+
+        canon = canonical_chapters.get(c_idx)
+        if canon:
+            ch["title"] = canon.get("title", ch.get("title"))
+            ch["subsections"] = canon.get("subsections", ch.get("subsections", []))
+            if canon.get("full_text"):
+                ch["full_text"] = canon.get("full_text")
+
+        text = ch.get("full_text") or source_text or ""
+        theory_data = qge.generate_chapter_theory_and_cards(
+            chapter_title=ch.get("title", f"Chapter {c_idx}"),
+            chapter_text=text[:30000],
+            subject=subject,
+            tier=tier,
+            chapter_index=c_idx,
+            use_llm=use_llm,
+            include_cards=True,
+            allow_cloud_fallback=allow_cloud,
+        )
+        ch["summary"] = theory_data.get("summary", "")
+        ch["objectives"] = theory_data.get("objectives", [])
+        ch["cards"] = theory_data.get("cards", [])
+        ch["deep_theory"] = theory_data.get("deep_theory", {})
+        ch["theory_source"] = theory_data.get("theory_source", "deterministic")
+        enriched_chapters.append(c_idx)
+
+    course["chapters"] = chapters
+    course["cards"] = [c for chh in chapters for c in chh.get("cards", [])]
+    course["flashcards_count"] = len(course["cards"])
+    CourseManager.save_custom_course(course)
+    return {
+        "status": "success",
+        "course_id": course_id,
+        "enriched_chapters": enriched_chapters,
+        "chapters_count": len(chapters),
+        "message": f"Successfully re-enriched {len(enriched_chapters)} chapter(s)."
+    }
 
 
 # --- BACKEND ENDPOINT ROUTERS ---
@@ -1125,10 +1226,14 @@ async def evaluate_short_answer(payload: ShortAnswerPayload):
     api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
     model = None
     if api_key:
+        model_name = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
         try:
-            model = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.2, google_api_key=api_key)
-        except Exception as e:
-            print("GEMINI INIT NOTICE:", e)
+            model = ChatGoogleGenerativeAI(model=model_name, temperature=0.2, google_api_key=api_key)
+        except Exception:
+            try:
+                model = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.2, google_api_key=api_key)
+            except Exception as e:
+                print("GEMINI INIT NOTICE:", e)
 
     # ══════════════════════════════════════════════════════════════════════════════
     # STAGE 1 — Combined Grading + Error Severity + Specific Gap Diagnosis
@@ -1161,7 +1266,7 @@ async def evaluate_short_answer(payload: ShortAnswerPayload):
         if model:
             try:
                 diag_res = model.invoke([HumanMessage(content=diagnostic_prompt)])
-                diag_res_text = diag_res.content
+                diag_res_text = normalize_ai_content(diag_res.content)
             except Exception as ge:
                 print(f"[evaluate_short_answer] Gemini diagnostic warning: {ge}")
 
@@ -1291,7 +1396,7 @@ async def evaluate_short_answer(payload: ShortAnswerPayload):
         if model:
             try:
                 response = model.invoke([HumanMessage(content=hint_prompt)])
-                hint_raw_text = response.content
+                hint_raw_text = normalize_ai_content(response.content)
             except Exception as ge:
                 print(f"[evaluate_short_answer] Gemini hint warning: {ge}")
 
@@ -1563,9 +1668,13 @@ async def evaluate_final_exam(payload: ExamSubmissionPayload):
 
     if api_key:
         try:
-            model = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.2, google_api_key=api_key)
+            model_name = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+            try:
+                model = ChatGoogleGenerativeAI(model=model_name, temperature=0.2, google_api_key=api_key)
+            except Exception:
+                model = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.2, google_api_key=api_key)
             response = model.invoke([HumanMessage(content=hint_prompt)])
-            remediation_hint = response.content.strip()
+            remediation_hint = normalize_ai_content(response.content).strip()
             for q in incorrect_details:
                 repo_q = exam_questions.get(q.get("qId", ""), {})
                 expected = repo_q.get("expected", "")

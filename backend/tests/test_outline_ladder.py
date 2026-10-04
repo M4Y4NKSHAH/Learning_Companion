@@ -341,3 +341,23 @@ def test_prepare_chapter_context_multisection_sampling():
     assert tail_token in ctx
     assert len(ctx) <= 7600
 
+
+def test_material_parser_no_duplicate_chapter_prefix():
+    """Asserts that markdown # Chapter 1: headings never result in duplicate 'Chapter 1: Chapter 1:'."""
+    from material_parser import MaterialParser
+    text = (
+        "# Chapter 1: Introduction to Computer Science\n\n1.1 Foundations\n"
+        + "Instructional text content for testing. " * 50
+        + "\n1.2 Advanced\n"
+        + "More content text here for testing. " * 50
+        + "\n# Chapter 2: Algorithms\n\n2.1 Sorting\n"
+        + "Algorithm content. " * 50
+        + "\n2.2 Searching\n"
+        + "Search content. " * 50
+    )
+    chs = MaterialParser.detect_outline_or_chapters(text)
+    assert len(chs) == 2
+    assert chs[0]["title"] == "Chapter 1: Introduction to Computer Science"
+    assert chs[1]["title"] == "Chapter 2: Algorithms"
+
+

@@ -280,11 +280,20 @@ def _execute_tutor_generation(
     api_key = get_gemini_api_key()
     if api_key:
         try:
-            model = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=temperature, google_api_key=api_key)
+            try:
+                from backend.question_generator import normalize_ai_content
+            except ImportError:
+                from question_generator import normalize_ai_content
+            model_name = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+            try:
+                model = ChatGoogleGenerativeAI(model=model_name, temperature=temperature, google_api_key=api_key)
+            except Exception:
+                model = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=temperature, google_api_key=api_key)
             payload = [HumanMessage(content=system_prompt), HumanMessage(content=student_query)]
             response = model.invoke(payload)
             if response and response.content:
-                cleaned = filter_for_grade_level(response.content.strip(), tier)
+                raw_str = normalize_ai_content(response.content).strip()
+                cleaned = filter_for_grade_level(raw_str, tier)
                 if expected_answer:
                     cleaned = sanitize_hint_text(cleaned, expected_answer)
                 return cleaned

@@ -179,12 +179,16 @@ def generate_gemini_flashcards_from_chroma(
 
     if api_key:
         try:
-            from langchain_core.messages import HumanMessage
-            from langchain_google_genai import ChatGoogleGenerativeAI
-
-            model = ChatGoogleGenerativeAI(
-                model="gemini-2.5-flash", temperature=0.3, google_api_key=api_key
-            )
+            from question_generator import normalize_ai_content
+            model_name = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+            try:
+                model = ChatGoogleGenerativeAI(
+                    model=model_name, temperature=0.3, google_api_key=api_key
+                )
+            except Exception:
+                model = ChatGoogleGenerativeAI(
+                    model="gemini-2.5-flash", temperature=0.3, google_api_key=api_key
+                )
 
             prompt = (
                 f"You are an expert curriculum designer for {subject} ({tier}).\n"
@@ -199,8 +203,9 @@ def generate_gemini_flashcards_from_chroma(
             )
 
             response = model.invoke([HumanMessage(content=prompt)])
+            raw_content = normalize_ai_content(response.content)
             clean_json = (
-                response.content.replace("```json", "")
+                raw_content.replace("```json", "")
                 .replace("```", "")
                 .strip()
             )

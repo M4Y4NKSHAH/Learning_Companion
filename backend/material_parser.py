@@ -418,7 +418,10 @@ class MaterialParser:
                 else:
                     main_title = grouped_chapters[ch_num]["main_title"]
 
-                clean_ch_title = f"Chapter {ch_num}: {main_title}"
+                stripped_title = re.sub(r"(?i)^\s*(?:chapter|unit|part|lesson|module)\s*(?:\d{1,3}|[ivxlcdm]{1,7})?\s*[:.\-–—)]?\s*", "", main_title).strip()
+                stripped_title = re.sub(r"^\s*\d{1,3}\s*[:.\-–—)]?\s+", "", stripped_title).strip()
+                final_title = stripped_title or main_title
+                clean_ch_title = f"Chapter {ch_num}: {final_title}"
                 if len(ch_text) >= 800:
                     unique_subs = []
                     seen_labels = set()

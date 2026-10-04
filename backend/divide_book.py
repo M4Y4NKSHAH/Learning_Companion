@@ -52,6 +52,12 @@ backend_dir = os.path.dirname(os.path.abspath(__file__))
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
+
 from book_structurer import (GENERIC_BACKMATTER, BookStructurer,
                              pretty_title_from_filename, slugify)
 from course_manager import CourseManager
@@ -265,6 +271,16 @@ class SmartBookDivider:
         (.pdf/.epub/.mobi/.xps/.fb2); `text` allows raw in-memory content
         (pasted notes, API payloads). Structure is always inferred, never assumed.
         """
+        if isinstance(book_key, dict):
+            path = path or book_key.get("path")
+            text = text or book_key.get("text")
+            title = title or book_key.get("title")
+            subject = subject or book_key.get("subject")
+            tier = tier or book_key.get("tier")
+            course_id = course_id or book_key.get("course_id")
+            units = units or book_key.get("units")
+            book_key = None
+
         if path or text or extracted_book is not None:
             self.book = self._ad_hoc_book(path=path, text=text, title=title,
                                           subject=subject, tier=tier,
@@ -879,15 +895,13 @@ class SmartBookDivider:
         text = chapter.get("full_text", "")
         theory = engine.generate_chapter_theory_and_cards(
             chapter_title=chapter.get("title", ""),
-            # The local 3B model has a small working context: feed it the
-            # chapter's opening sections, which carry the definitions/formulas.
-            chapter_text=text[:9000] if use_llm else text[:6000],
+            # The local 3B model or cloud LLM receives substantive chapter text
+            chapter_text=text[:25000] if use_llm else text[:6000],
             subject=subject,
             tier=tier,
             chapter_index=chapter.get("chapter_index", 1),
             use_llm=use_llm,
-            # Local-first contract: never fall out to a cloud model mid-build.
-            allow_cloud_fallback=False,
+            allow_cloud_fallback=bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")),
             include_cards=include_cards,
         )
         chapter["summary"] = theory.get("summary", "")

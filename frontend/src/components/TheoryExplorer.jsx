@@ -299,15 +299,23 @@ export default function TheoryExplorer({
                 className={`px-2.5 py-1 rounded-full text-[11px] font-mono uppercase tracking-wider font-semibold border ${
                   currentChapter.theory_source === 'llm'
                     ? 'bg-ember-500/15 text-ember-300 border-ember-500/30'
+                    : currentChapter.theory_source === 'cloud'
+                    ? 'bg-clay-500/15 text-clay-300 border-clay-500/30'
                     : 'bg-olive-500/15 text-olive-300 border-olive-500/30'
                 }`}
                 title={
                   currentChapter.theory_source === 'llm'
                     ? 'Theory enriched by the fine-tuned local Llama model'
+                    : currentChapter.theory_source === 'cloud'
+                    ? 'Theory synthesized by Google Gemini 3.8 Flash'
                     : 'Theory built offline from the source text'
                 }
               >
-                {currentChapter.theory_source === 'llm' ? 'Local Llama' : 'Offline Grounded'}
+                {currentChapter.theory_source === 'llm'
+                  ? 'Local Llama'
+                  : currentChapter.theory_source === 'cloud'
+                  ? 'Gemini 3.8 Flash'
+                  : 'Offline Grounded'}
               </span>
             )}
           </div>
@@ -567,8 +575,8 @@ export default function TheoryExplorer({
                 <div key={idx} className="space-y-3">
                   <h4 className="text-base sm:text-lg font-bold text-sand-50">{mm.concept}</h4>
                   <div
-                    className="p-4 sm:p-5 rounded-2xl bg-sand-900/95 border border-ember-500/30 text-sm sm:text-base leading-relaxed font-serif shadow-sm text-[#1E1B18] !text-[#1E1B18]"
-                    style={{ color: '#1E1B18' }}
+                    className="p-4 sm:p-5 rounded-2xl border-l-4 border text-sm sm:text-base leading-relaxed font-serif shadow-sm text-[#1E1B18] !text-[#1E1B18] bg-[#FAF0E6] !bg-[#FAF0E6]"
+                    style={{ backgroundColor: '#FAF0E6', color: '#1E1B18', borderColor: '#D9D1C3', borderLeftColor: '#9A5530' }}
                   >
                     {mm.analogy}
                   </div>
@@ -706,10 +714,10 @@ export default function TheoryExplorer({
                 {workedExamples.map((we, idx) => (
                   <div key={idx} className="p-5 sm:p-6 rounded-2xl bg-sand-950 border border-sand-800 space-y-2.5">
                     <h4 className="text-sm sm:text-base font-bold text-ember-400 uppercase tracking-wider">
-                      {we.title || `Example ${idx + 1}`}
+                      {we.title || we.source || `Example ${idx + 1}`}
                     </h4>
                     <p className="text-sm sm:text-base text-sand-100 leading-relaxed whitespace-pre-line">
-                      {we.content}
+                      {we.content || we.worked_problem}
                     </p>
                   </div>
                 ))}

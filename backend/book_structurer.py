@@ -513,19 +513,22 @@ class BookStructurer:
         if not contents_m:
             return None
 
-        # Look for chapter_digits in running body text
-        cand_patterns = _chapter_candidates()
-        spots = self._spots_from_regex(cand_patterns[0][1], "digits")
-        if not spots:
+        # Look for chapter markers in running body text across candidates that span the document
+        scored = [c for c in self._scan_chapters() if c.get("spread", 0) >= 0.35 and c.get("score", 0) >= 0.4]
+        if not scored:
             return None
-        body_spots = self._strip_front_matter_duplicates(spots)
-        if len(body_spots) < self.MIN_CHAPTERS:
-            return None
+        best_cand = max(scored, key=lambda c: c["score"])
+        body_spots = best_cand["spots"]
+        chosen_cand_kind = best_cand["kind"]
 
-        body_start = self._find_body_start(body_spots, "chapter_digits")
+        body_start = self._find_body_start(body_spots, chosen_cand_kind)
         front = self.text[contents_m.start():body_start]
 
-        chapter_mark_re = re.compile(r"^[ \t]*CHAPTER\s+(\d{1,3})\s*$", re.IGNORECASE)
+        chapter_mark_re = re.compile(
+            r"^[ \t]*(?:CHAPTER\s+)?(\d{1,3})(?!\.)[:\s\-–—]+([A-Z][^\n]{2,80}?)(?:\s+\d{1,4})?\s*$",
+            re.IGNORECASE
+        )
+        chapter_bare_re = re.compile(r"^[ \t]*CHAPTER\s+(\d{1,3})\s*$", re.IGNORECASE)
         section_re = re.compile(r"^[ \t]*(\d{1,3})\.(\d{1,3})\s+(.+)$")
 
         parsed: List[Dict[str, Any]] = []
@@ -544,20 +547,26 @@ class BookStructurer:
             line = raw.strip().replace("\u00f2", " ").strip()
             if not line:
                 continue
-            cm = chapter_mark_re.match(line)
+            sm = section_re.match(line)
+            if sm:
+                if current is not None and int(sm.group(1)) == current["chapter"]:
+                    _finalize()
+                    t = re.sub(r"\s+\d{1,4}\s*$", "", sm.group(3)).strip()
+                    current["sections"].append({"label": f"{sm.group(1)}.{sm.group(2)}", "title": t})
+                continue
+            cm = chapter_bare_re.match(line)
             if cm:
                 _finalize()
                 current = {"chapter": int(cm.group(1)), "title": "", "sections": [], "page": None}
                 parsed.append(current)
                 awaiting_title = True
                 continue
-            if current is None:
-                continue
-            sm = section_re.match(line)
-            if sm and int(sm.group(1)) == current["chapter"]:
+            cm_inline = chapter_mark_re.match(line)
+            if cm_inline:
                 _finalize()
-                t = re.sub(r"\s+\d{1,4}\s*$", "", sm.group(3)).strip()
-                current["sections"].append({"label": f"{sm.group(1)}.{sm.group(2)}", "title": t})
+                t = re.sub(r"\s+\d{1,4}\s*$", "", cm_inline.group(2)).strip()
+                current = {"chapter": int(cm_inline.group(1)), "title": t, "sections": [], "page": None}
+                parsed.append(current)
                 continue
             if awaiting_title and re.search(r"[A-Za-z]{3,}", line):
                 pg = re.search(r"\s+(\d{1,4})\s*$", line)
@@ -568,7 +577,16 @@ class BookStructurer:
                 continue
         _finalize()
 
-        valid_chapters = [c for c in parsed if c.get("title") and (c.get("sections") or c.get("page"))]
+        # Deduplicate parsed chapters, prioritizing entries with parsed sections
+        seen_ch: Set[int] = set()
+        deduped_parsed: List[Dict[str, Any]] = []
+        for c in parsed:
+            ch_num = c["chapter"]
+            if ch_num not in seen_ch and c.get("title") and (c.get("sections") or c.get("page")):
+                seen_ch.add(ch_num)
+                deduped_parsed.append(c)
+
+        valid_chapters = deduped_parsed
         if len(valid_chapters) < self.MIN_CHAPTERS:
             return None
 
@@ -590,14 +608,17 @@ class BookStructurer:
 
         plan = StructurePlan()
         plan.source = "printed_toc"
-        plan.chapter_kind = "chapter_digits"
+        plan.chapter_kind = chosen_cand_kind
         plan.chapter_matches = sorted(matched_body_spots, key=lambda s: s.pos)
         plan.parsed_chapters = valid_chapters
         plan.toc_detected = True
         plan.toc_count = sum(len(c["sections"]) + 1 for c in valid_chapters)
         plan.confidence = 0.95
         plan.body_start = plan.chapter_matches[0].pos if plan.chapter_matches else body_start
-        self._detect_sections(plan)
+        if any("." in s.get("label", "") for c in valid_chapters for s in c.get("sections", [])):
+            plan.section_kind = "numdot"
+        else:
+            self._detect_sections(plan)
         self._detect_units(plan)
         plan.running_forms = self._detect_running_forms()
         plan.notes.append(
@@ -1151,14 +1172,19 @@ class BookStructurer:
         counts: List[int] = []
         for num, start, end in spans:
             body = self.text[start:end]
-            found = 0
-            for m in regex.finditer(body):
-                if kind in ("numdot", "numdot_deep"):
+            if kind in ("numdot", "numdot_deep"):
+                unique_labels = set()
+                for m in regex.finditer(body):
                     parent = self._to_number(m.group(1), "digits")
                     if parent != num:
                         continue
-                found += 1
-            counts.append(found)
+                    unique_labels.add(m.group(2))
+                counts.append(len(unique_labels))
+            else:
+                found = 0
+                for m in regex.finditer(body):
+                    found += 1
+                counts.append(found)
         if not counts:
             return 0.0
         good = sum(1 for c in counts if 2 <= c <= 15) / len(counts)
@@ -1231,6 +1257,7 @@ class BookStructurer:
 
         regex = dict(_section_patterns())[plan.section_kind]
         numbered = plan.chapter_kind not in ("hash_headings", "titled_caps", "none")
+        seen_labels: Set[str] = set()
         for i, ln in enumerate(lines):
             stripped = ln.strip()
             if not stripped or len(stripped) > 110:
@@ -1242,16 +1269,19 @@ class BookStructurer:
                 parent = self._to_number(m.group(1), "digits")
                 if parent is None or (numbered and parent != parent_num):
                     continue
-                title = m.group(3).strip()
                 label = f"{parent}.{m.group(2)}"
+                if label in seen_labels:
+                    continue
+                title = re.sub(r"\s+\d{1,4}\s*$", "", m.group(3)).strip()
+                seen_labels.add(label)
             elif plan.section_kind == "dashdot":
-                title = m.group(2).strip()
+                title = re.sub(r"\s+\d{1,4}\s*$", "", m.group(2)).strip()
                 label = f"{parent_num}.{len(out) + 1}"
             elif regex.groups > 1:
-                title = m.group(2).strip()
+                title = re.sub(r"\s+\d{1,4}\s*$", "", m.group(2)).strip()
                 label = f"{parent_num}.{len(out) + 1}"
             else:
-                title = m.group(1).strip()
+                title = re.sub(r"\s+\d{1,4}\s*$", "", m.group(1)).strip()
                 label = f"{parent_num}.{len(out) + 1}"
             if len(title) < 3 or not re.search(r"[A-Za-z]{3,}", title):
                 continue

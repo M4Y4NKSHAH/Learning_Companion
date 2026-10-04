@@ -5,6 +5,12 @@ import uuid
 from typing import Dict, List, Any, Optional
 
 try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
+
+try:
     from langchain_core.messages import HumanMessage
     from langchain_google_genai import ChatGoogleGenerativeAI
     LANGCHAIN_GEMINI_AVAILABLE = True
@@ -20,6 +26,14 @@ try:
     from backend.pedagogical_guardrails import get_grade_level_guardrails, filter_for_grade_level
 except ImportError:
     from pedagogical_guardrails import get_grade_level_guardrails, filter_for_grade_level
+
+
+
+def normalize_ai_content(content: Any) -> str:
+    """Universal normalizer handling strings, lists of dict parts (Gemini 3.8 Flash), etc."""
+    if isinstance(content, list):
+        return "".join(part.get("text", str(part)) if isinstance(part, dict) else str(part) for part in content)
+    return str(content or "")
 
 
 # --------------------------------------------------------------------------- #
@@ -71,14 +85,24 @@ class QuestionGeneratorEngine:
         """Returns Gemini model instance for single-pass guiding if API key is available."""
         if not (LANGCHAIN_GEMINI_AVAILABLE and self.api_key):
             return None
+        model_name = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
         try:
             return ChatGoogleGenerativeAI(
-                model="gemini-2.5-flash",
+                model=model_name,
                 temperature=0.2,
                 google_api_key=self.api_key,
                 max_retries=1
             )
         except Exception as e:
+            try:
+                return ChatGoogleGenerativeAI(
+                    model="gemini-2.5-flash",
+                    temperature=0.2,
+                    google_api_key=self.api_key,
+                    max_retries=1
+                )
+            except Exception:
+                pass
             print(f"[Guiding Agent] Gemini init warning: {e}")
             return None
 # ------------------------------------------------------------------ #
@@ -140,7 +164,8 @@ class QuestionGeneratorEngine:
         try:
             print("[Guiding Agent] Requesting single-pass curriculum blueprint from Gemini...")
             res = gemini.invoke([HumanMessage(content=prompt)])
-            clean_json = res.content.replace("```json", "").replace("```", "").strip()
+            raw_content = normalize_ai_content(res.content)
+            clean_json = raw_content.replace("```json", "").replace("```", "").strip()
             try:
                 blueprint = json.loads(clean_json)
             except Exception:
@@ -259,6 +284,8 @@ class QuestionGeneratorEngine:
             c1=definitions[0]["text"] if definitions else "",
             c2=definitions[1]["text"] if len(definitions) > 1 else "",
             c_formula=equations[0]["full"] if equations else "",
+            definitions=definitions,
+            equations=equations,
         )
 
         cards_out = local_cards if (local_out is not None and local_cards) else None
@@ -268,11 +295,15 @@ class QuestionGeneratorEngine:
         # --- 4. Ground & merge ------------------------------------------------- #
         deep_theory = self._ground_deep_theory(blueprint, deep_root, equations, definitions)
 
-        # key_terms / worked_examples are always deterministic (source extracted)
+        # key_terms are source extracted
         if key_terms:
             deep_theory["key_terms"] = key_terms
-        if worked_examples:
+        # worked_examples: preserve model-synthesized worked_examples if present, supplement/fallback from source
+        if worked_examples and not deep_theory.get("worked_examples"):
             deep_theory["worked_examples"] = worked_examples
+        elif worked_examples and deep_theory.get("worked_examples"):
+            if len(deep_theory["worked_examples"]) < 2:
+                deep_theory["worked_examples"].extend(worked_examples[:2 - len(deep_theory["worked_examples"])])
 
         summary = self._coerce_str(blueprint.get("summary")) or self._skeleton_summary(clean_title, facts)
         objectives = self._coerce_list(blueprint.get("objectives")) or [
@@ -503,6 +534,7 @@ class QuestionGeneratorEngine:
         guardrails = get_grade_level_guardrails(tier)
         prohibitions = "\n".join(f"- {p}" for p in guardrails["strict_prohibitions"])
         requirements = "\n".join(f"- {r}" for r in guardrails["mandatory_requirements"])
+        ctx = self._prepare_chapter_context(text, max_chars=24000)
         try:
             prompt = (
                 f"You are an expert curriculum architect for {subject}.\n"
@@ -511,13 +543,23 @@ class QuestionGeneratorEngine:
                 f"STRICT PROHIBITIONS:\n{prohibitions}\n"
                 f"MANDATORY REQUIREMENTS:\n{requirements}\n\n"
                 f"Chapter {chapter_index}: '{title}'\n"
-                f"Source text:\n\"\"\"{text[:3200]}\"\"\"\n\n"
-                "Return a JSON object with exactly: summary(string), objectives(array of 3),\n"
-                "principles, formulations, mental_models, misconceptions (arrays as before),\n"
-                "and cards (array of 3 with topic/question/answer). Respond ONLY with the JSON."
+                f"Source text:\n\"\"\"{ctx}\"\"\"\n\n"
+                "Return a JSON object with EXACTLY these keys and shapes:\n"
+                "{\n"
+                '  "summary": "Deep, rigorous 3-4 sentence comprehensive academic synthesis detailing governing computational/scientific/mathematical mechanisms.",\n'
+                '  "objectives": ["Specific action-oriented objective", "Analytical objective", "Evaluative objective"],\n'
+                '  "principles": [{"title": "Precise Concept Name", "content": "Rigorous definition or governing law explaining operational mechanics", "tag": "Core Axiom|Governing Law|Definition"}],\n'
+                '  "formulations": [{"title": "Analytical Specification", "formula": "Governing equation, definition, or algorithmic invariant", "derivation": "Step-by-step reasoning or mathematical justification", "variables": "Precise breakdown of symbols, units, and boundaries"}],\n'
+                '  "mental_models": [{"concept": "Core Concept Name", "analogy": "Vivid intuitive real-world physical analogy explaining how the system behaves", "takeaway": "Actionable conceptual heuristic or invariant rule"}],\n'
+                '  "worked_examples": [{"title": "Concrete Worked Example", "content": "Step-by-step problem walkthrough from the chapter with parameters, method, and conclusion"}],\n'
+                '  "misconceptions": [{"trap": "Common student misconception or pitfall", "correction": "Deep conceptual correction explaining why intuition fails"}],\n'
+                '  "cards": [{"topic": "...", "question": "Clear concept question?", "answer": "• Key point 1\\n• Key point 2\\n• Key point 3"}]\n'
+                "}\n"
+                "Base every field strictly on the source text. Provide thorough educational depth. Respond ONLY with the JSON."
             )
             res = gemini.invoke([HumanMessage(content=prompt)])
-            clean_json = res.content.replace("```json", "").replace("```", "").strip()
+            raw_content = normalize_ai_content(res.content)
+            clean_json = raw_content.replace("```json", "").replace("```", "").strip()
             parsed = json.loads(clean_json)
             if isinstance(parsed, dict):
                 return parsed
@@ -602,41 +644,78 @@ class QuestionGeneratorEngine:
             if existing_ex:
                 deep["worked_examples"] = existing_ex[:3]
 
-        # Ground formulations with source equations when the LLM omitted/erred.
-        if equations:
-            grounded_formulas = []
-            for f in equations[:3]:
-                grounded_formulas.append({
-                    "title": f"Equation: {f['lhs']}",
-                    "formula": f["full"],
-                    "derivation": "Extracted verbatim from the source chapter text.",
-                    "variables": f"LHS: {f['lhs']} = RHS: {f['rhs']}",
-                })
-            if deep.get("formulations"):
-                kept = [fm for fm in deep["formulations"] if isinstance(fm, dict) and self._in_text(fm.get("formula", ""), [e["full"] for e in equations])]
-                if kept:
-                    combined = kept[:2] + grounded_formulas[:1]
-                    seen = set()
-                    deep["formulations"] = []
-                    for fm in combined:
-                        key = fm.get("formula", "")
-                        if key and key not in seen:
-                            seen.add(key)
-                            deep["formulations"].append(fm)
-                else:
-                    deep["formulations"] = grounded_formulas[:2]
-            else:
-                deep["formulations"] = grounded_formulas[:2]
+        # Ground formulations: prioritize model-synthesized formulations, supplement with verified equations
+        llm_formulas = self._coerce_list(blueprint.get("formulations"))
+        cleaned_formulas = []
+        if llm_formulas:
+            for f in llm_formulas:
+                if isinstance(f, dict) and (f.get("formula") or f.get("title")):
+                    cleaned_formulas.append({
+                        "title": self._coerce_str(f.get("title")) or "Governing Formulation",
+                        "formula": self._coerce_str(f.get("formula")) or self._coerce_str(f.get("content")),
+                        "derivation": self._coerce_str(f.get("derivation")) or "Derived from governing first principles.",
+                        "variables": self._coerce_str(f.get("variables")) or "Operational symbols and boundary constraints.",
+                    })
+        if cleaned_formulas:
+            deep["formulations"] = cleaned_formulas[:3]
+        elif equations:
+            is_generic_formula = any("Analytical Formulation" in f.get("title", "") or "y = f(x" in f.get("formula", "") for f in deep.get("formulations", []))
+            if is_generic_formula:
+                grounded_formulas = []
+                for f in equations[:4]:
+                    f_full = f.get("full", "")
+                    if len(f_full) < 65 and not any(w in f_full.lower() for w in ("calculator", "menu", "graph", "chapter", "exercise", "figure")):
+                        grounded_formulas.append({
+                            "title": f"Governing Equation: {f['lhs']}",
+                            "formula": f_full,
+                            "derivation": "Extracted verbatim from the verified source textbook text.",
+                            "variables": f"LHS: {f['lhs']} = RHS: {f['rhs']}",
+                        })
+                if grounded_formulas:
+                    deep["formulations"] = grounded_formulas[:3]
 
-        # Ground principles with source definitions when absent.
-        if definitions and len(deep.get("principles", [])) < 2:
-            existing = deep.get("principles", []) or []
-            for d in definitions[: (2 - len(existing))]:
-                deep.setdefault("principles", []).append({
-                    "title": d["concept"],
-                    "content": d["text"],
-                    "tag": "Definition",
-                })
+        # Ground principles: prioritize model-synthesized principles, supplement with verified definitions
+        llm_principles = self._coerce_list(blueprint.get("principles"))
+        cleaned_principles = []
+        if llm_principles:
+            for p in llm_principles:
+                if isinstance(p, dict):
+                    t = self._coerce_str(p.get("title"))
+                    c = self._coerce_str(p.get("content"))
+                    if t and c:
+                        cleaned_principles.append({
+                            "title": t,
+                            "content": c,
+                            "tag": self._coerce_str(p.get("tag")) or "Core Axiom",
+                        })
+            if cleaned_principles:
+                deep["principles"] = cleaned_principles[:4]
+        elif definitions:
+            is_generic_p = any("Primary Governing Principle" in p.get("title", "") or "Foundational Mathematical Axiom" in p.get("title", "") for p in deep.get("principles", []))
+            vignette_words = (
+                "vacation", "student", "spring break", "farmer", "pump", "diameter",
+                "ticket", "hotel", "salary", "trip", "mile", "car", "population",
+                "country", "ferris wheel", "wheel", "dollar", "store", "company", "cent",
+            )
+            grounded_p = []
+            for d in definitions:
+                dt = d.get("text", "")
+                concept = d.get("concept", "")
+                if dt and concept and not any(w in dt.lower() for w in vignette_words):
+                    content = dt if dt.lower().startswith(concept.lower()) else f"{concept} is defined as {dt}."
+                    grounded_p.append({
+                        "title": concept,
+                        "content": content,
+                        "tag": "Definition",
+                    })
+                if len(grounded_p) >= 3:
+                    break
+            if grounded_p and is_generic_p:
+                deep["principles"] = grounded_p
+            elif grounded_p:
+                for gp in grounded_p:
+                    if len(deep["principles"]) < 4 and not any(p.get("title", "").lower() == gp["title"].lower() for p in deep["principles"]):
+                        deep["principles"].append(gp)
 
         return deep
 
@@ -697,15 +776,20 @@ class QuestionGeneratorEngine:
     @staticmethod
     def _skeleton_summary(title: str, facts: List[Dict[str, str]]) -> str:
         """Deterministic 2-3 sentence summary built from extracted facts."""
-        parts = [f"{title} establishes the core theoretical framework of its domain."]
+        parts = [f"{title} establishes the core theoretical framework and analytical methods of its domain."]
         eqs = [f["full"] for f in facts if f["type"] == "equation"][:2]
         defs = [d["text"] for d in facts if d["type"] == "definition"][:1]
         if defs:
-            parts.append(defs[0])
+            clean_def = defs[0].strip()
+            if len(clean_def) >= 25:
+                if clean_def[0].isupper() and clean_def.endswith("."):
+                    parts.append(clean_def)
+                else:
+                    parts.append(f"A key governing definition specifies that {clean_def.rstrip('.')}.")
         if eqs:
             parts.append(f"Its governing relations include {' and '.join(eqs)}.")
         if len(parts) < 3:
-            parts.append("Mastering the definitions and boundary conditions is essential for applying the framework.")
+            parts.append("Mastering these foundational definitions and boundary conditions is essential for applying the framework.")
         return " ".join(parts)
 
     def _facts_to_cards(self, title: str, facts: List[Dict[str, str]], subject: str) -> List[Dict[str, Any]]:
@@ -809,27 +893,36 @@ class QuestionGeneratorEngine:
         return terms[:6]
 
     @staticmethod
-    def _extract_worked_examples(text: str, max_chars: int = 260) -> List[Dict[str, str]]:
+    def _extract_worked_examples(text: str, max_chars: int = 500) -> List[Dict[str, str]]:
         """Pulls short worked-example / solved-problem snippets verbatim from the source."""
         examples = []
         if not text:
             return examples
 
         markers = re.compile(
-            r"(Example\s+\d+(?:\.\d+)?|EXAMPLE\s+\d+|Worked Example|Example \d+|e\.g\.[^.!?]+)",
+            r"(Example\s+\d+(?:\.\d+)?|EXAMPLE\s+\d+|Worked Example|Example \d+)",
             re.IGNORECASE
         )
         for m in markers.finditer(text):
             start = m.end()
             snippet = text[start:start + max_chars]
-            # Cut at the next likely example/heading boundary
-            cut = re.search(r"\n\s*(Example|Solution|Check Your Understanding|Try It|Test Prep|$)", snippet, re.IGNORECASE)
+            # Cut at next example heading or major boundary, NOT 'Solution'
+            cut = re.search(r"\n\s*(?:Example\s+\d+|EXAMPLE\s+\d+|Worked Example|Check Your Understanding|Try It|Test Prep|Section Exercises|#{1,3}\s+)", snippet, re.IGNORECASE)
             if cut:
                 snippet = snippet[:cut.start()]
             snippet = snippet.strip()
+            # Clean up trailing whitespace and running headers like "84     2"
+            snippet = re.sub(r"\n\s*\d{1,4}\s*(?:\n|$)", "\n", snippet).strip()
             if len(snippet) > 40:
-                examples.append({"source": m.group(0).strip(), "worked_problem": snippet[:max_chars]})
-            if len(examples) >= 2:
+                first_line = snippet.split("\n")[0].strip()
+                ex_title = f"{m.group(0).strip()}: {first_line}" if len(first_line) < 60 and not first_line.lower().startswith("solution") else m.group(0).strip()
+                examples.append({
+                    "title": ex_title,
+                    "content": snippet,
+                    "source": m.group(0).strip(),
+                    "worked_problem": snippet,
+                })
+            if len(examples) >= 3:
                 break
         return examples
 # ------------------------------------------------------------------ #
@@ -839,110 +932,404 @@ class QuestionGeneratorEngine:
         self,
         subject: str,
         chapter_title: str,
-        c1: str,
-        c2: str,
-        c_formula: str,
+        c1: str = "",
+        c2: str = "",
+        c_formula: str = "",
+        definitions: Optional[List[Dict[str, Any]]] = None,
+        equations: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
-        """Always-available, grade-neutral deep theory built from extracted facts."""
+        """Always-available, rigorous deep theory built from extracted facts or domain axioms."""
         subj = subject.lower()
+        title_l = (chapter_title or "").lower()
+        vignette_words = (
+            "vacation", "student", "spring break", "farmer", "pump", "diameter",
+            "ticket", "hotel", "salary", "trip", "mile", "car", "population",
+            "country", "ferris wheel", "wheel", "dollar", "store", "company", "cent",
+        )
+        def _clean_definition(d: str) -> str:
+            if not d:
+                return ""
+            dl = d.lower()
+            if any(w in dl for w in vignette_words):
+                return ""
+            if dl.startswith(("arbitrary choice", "graph of this", "turning point of", "second most")):
+                return ""
+            return d
 
-        if "phys" in subj or "mech" in subj:
-            principles_a = f"{c1}" if c1 else f"{chapter_title} establishes the fundamental laws governing its domain, defining how measurable quantities relate and interact."
-            principles_b = f"{c2}" if c2 else f"{chapter_title} connects idealised models to observed reality through clearly stated assumptions and boundary conditions."
-            formulation = c_formula or "The governing equation links the state variables and constants introduced in this chapter."
+        grounded_principles = []
+        if definitions:
+            for d in definitions:
+                dt = _clean_definition(d.get("text", ""))
+                concept = d.get("concept", "").strip()
+                if dt and concept:
+                    content = dt if dt.lower().startswith(concept.lower()) else f"{concept} is defined as {dt}."
+                    grounded_principles.append({
+                        "title": concept,
+                        "content": content,
+                        "tag": "Definition"
+                    })
+                if len(grounded_principles) >= 3:
+                    break
+
+        grounded_formulations = []
+        if equations:
+            for eq in equations[:3]:
+                f_full = eq.get("full", "")
+                if len(f_full) < 65 and not any(w in f_full.lower() for w in ("calculator", "menu", "graph", "chapter", "exercise", "figure")):
+                    grounded_formulations.append({
+                        "title": f"Governing Equation: {eq['lhs']}",
+                        "formula": f_full,
+                        "derivation": f"Mathematical relationship governing {eq['lhs']} and {eq['rhs']} in {chapter_title}.",
+                        "variables": f"LHS: {eq['lhs']} = RHS: {eq['rhs']}",
+                    })
+
+        c1 = _clean_definition(c1)
+        c2 = _clean_definition(c2)
+
+        # Domain knowledge catalog for high-fidelity offline synthesis
+        if "math" in subj or "calc" in subj or "algebra" in subj:
+            if "equation" in title_l or "inequalit" in title_l:
+                p_a = f"{c1}" if c1 else "An algebraic equation establishes equivalence between two expressions across all values in the solution set."
+                p_b = f"{c2}" if c2 else "Inequalities model boundary constraints; multiplying or dividing both sides by a negative scalar reverses the inequality orientation."
+                formulations = [
+                    {
+                        "title": "Quadratic Formula & Discriminant",
+                        "formula": "x = (-b ± √(b² - 4ac)) / (2a), with discriminant Δ = b² - 4ac.",
+                        "derivation": "Derived by completing the square on the general second-degree polynomial ax² + bx + c = 0.",
+                        "variables": "a, b, c = real coefficients (a ≠ 0); Δ > 0 indicates two distinct real roots, Δ = 0 a repeated root, Δ < 0 complex conjugate roots.",
+                    },
+                    {
+                        "title": "Cartesian Distance & Midpoint Metric",
+                        "formula": "d = √((x₂ - x₁)² + (y₂ - y₁)²),   M = ((x₁ + x₂)/2, (y₁ + y₂)/2)",
+                        "derivation": "Direct application of the Pythagorean theorem a² + b² = c² in the Euclidean coordinate plane ℝ².",
+                        "variables": "(x₁, y₁), (x₂, y₂) = coordinates in ℝ²; d = Euclidean separation; M = geometric midpoint.",
+                    },
+                    {
+                        "title": "Linear Slope & Invariant Form",
+                        "formula": "y = mx + b,   where m = (y₂ - y₁) / (x₂ - x₁)",
+                        "derivation": "Constant geometric rate of change across all collinear points on a non-vertical line.",
+                        "variables": "m = slope (rise over run); b = vertical y-intercept; x, y = coordinate variables.",
+                    }
+                ]
+                mental_models = [
+                    {
+                        "concept": "Balanced Scale Dynamic",
+                        "analogy": "View an equation as a two-pan balance scale: any algebraic operation performed on one side must be identically applied to the other to preserve equilibrium.",
+                        "takeaway": "Equilibrium is preserved only under identical invertible transformations; never divide by an expression that could evaluate to zero."
+                    }
+                ]
+                worked_examples = [
+                    {
+                        "title": "Solving Quadratic Equations via Factoring and Formula",
+                        "content": "Problem: Solve 2x² - 5x - 3 = 0.\nMethod:\n1. Identify coefficients: a = 2, b = -5, c = -3.\n2. Compute discriminant: Δ = (-5)² - 4(2)(-3) = 25 + 24 = 49 (positive, two distinct real roots).\n3. Apply quadratic formula: x = (5 ± √49) / (2 · 2) = (5 ± 7) / 4.\n4. Separate branches: x₁ = (5 + 7)/4 = 3; x₂ = (5 - 7)/4 = -2/4 = -1/2.\nConclusion: Solution set is {3, -1/2}."
+                    }
+                ]
+                misconceptions = [
+                    {
+                        "trap": "Failing to reverse the inequality sign when multiplying or dividing by a negative number",
+                        "correction": "Negating numbers reflects them across the origin on the real number line, reversing their relative directional order."
+                    }
+                ]
+                return {
+                    "principles": grounded_principles if len(grounded_principles) >= 2 else [
+                        {"title": "Algebraic Equivalence & Invariance", "content": p_a, "tag": "Core Axiom"},
+                        {"title": "Boundary Constraints & Order Monotonicity", "content": p_b, "tag": "Order Property"},
+                    ],
+                    "formulations": grounded_formulations if len(grounded_formulations) >= 2 else formulations,
+                    "mental_models": mental_models,
+                    "worked_examples": worked_examples,
+                    "misconceptions": misconceptions,
+                }
+            elif "function" in title_l or "graph" in title_l:
+                formulations = [
+                    {
+                        "title": "Function Composition & Domain Invariant",
+                        "formula": "(f ∘ g)(x) = f(g(x)),   dom(f ∘ g) = {x ∈ dom(g) | g(x) ∈ dom(f)}",
+                        "derivation": "Sequential evaluation of mappings where the inner function's image feeds the outer domain.",
+                        "variables": "f, g = functions; x = independent variable; dom = valid domain subset.",
+                    },
+                    {
+                        "title": "Difference Quotient & Rate Metric",
+                        "formula": "[f(x + h) - f(x)] / h,   h ≠ 0",
+                        "derivation": "Secant slope between two points (x, f(x)) and (x+h, f(x+h)) on a curved graph.",
+                        "variables": "x = evaluation input; h = non-zero step increment.",
+                    },
+                    {
+                        "title": "Invertibility & Identity Invariant",
+                        "formula": "f(f⁻¹(x)) = x   and   f⁻¹(f(x)) = x",
+                        "derivation": "A function is invertible if and only if it is one-to-one (passes horizontal line test).",
+                        "variables": "f = bijective mapping; f⁻¹ = inverse transformation.",
+                    }
+                ]
+                return {
+                    "principles": grounded_principles if len(grounded_principles) >= 2 else [
+                        {"title": "Deterministic Mapping Invariant", "content": f"{chapter_title} models relations where each allowed input produces exactly one unique output in the codomain.", "tag": "Core Axiom"},
+                        {"title": "Domain and Range Boundaries", "content": "The domain excludes inputs leading to division by zero or negative values under even-indexed roots.", "tag": "Boundary Condition"},
+                    ],
+                    "formulations": grounded_formulations if len(grounded_formulations) >= 2 else formulations,
+                    "mental_models": [
+                        {"concept": "Deterministic Pipeline", "analogy": "Treat a function as an automated factory conveyor belt: every raw input x produces a predictable output y without ambiguity.", "takeaway": "An ambiguous or multiple-output rule fails the vertical line test and is not a function."}
+                    ],
+                    "worked_examples": [
+                        {
+                            "title": "Evaluating and Inverting a Linear Function",
+                            "content": "Problem: Given f(x) = 3x - 5, find f⁻¹(x).\nMethod:\n1. Set y = 3x - 5.\n2. Swap variables to invert: x = 3y - 5.\n3. Solve for y: 3y = x + 5, so y = (x + 5) / 3.\nConclusion: The inverse function is f⁻¹(x) = (x + 5) / 3."
+                        }
+                    ],
+                    "misconceptions": [
+                        {"trap": "Confusing f⁻¹(x) with the reciprocal 1/f(x)", "correction": "The superscript -1 in f⁻¹ represents inverse mapping, not an arithmetic exponent."}
+                    ],
+                }
+            elif "polynomial" in title_l or "rational" in title_l:
+                formulations = [
+                    {
+                        "title": "General Polynomial Form",
+                        "formula": "P(x) = aₙxⁿ + aₙ₋₁xⁿ⁻¹ + ... + a₁x + a₀,   aₙ ≠ 0",
+                        "derivation": "Sum of monomials with non-negative integer exponents defining smooth continuous curves.",
+                        "variables": "aₙ = leading coefficient; n = non-negative integer degree; a₀ = constant term.",
+                    },
+                    {
+                        "title": "Rational Function & Asymptotes",
+                        "formula": "R(x) = P(x) / Q(x),   Q(x) ≠ 0",
+                        "derivation": "Ratio of polynomials; vertical asymptotes occur at zeros of Q(x) after cancelling common factors.",
+                        "variables": "P(x), Q(x) = polynomials; zeros of Q produce discontinuities.",
+                    }
+                ]
+                return {
+                    "principles": grounded_principles if len(grounded_principles) >= 2 else [
+                        {"title": "Fundamental Theorem of Algebra", "content": "Every polynomial of degree n ≥ 1 has exactly n complex roots, counting algebraic multiplicity.", "tag": "Core Axiom"},
+                        {"title": "End-Behavior Dominance", "content": "For large |x|, a polynomial's growth is completely governed by its leading term aₙxⁿ.", "tag": "Asymptotic Property"},
+                    ],
+                    "formulations": grounded_formulations if len(grounded_formulations) >= 2 else formulations,
+                    "mental_models": [
+                        {"concept": "Leading-Term Dominance", "analogy": "In extreme conditions, the highest-power term dwarfs all lower-power terms, like a rocket engine overtaking small auxiliary thrusters.", "takeaway": "Analyze degree and leading coefficient parity to immediately sketch global trajectory."}
+                    ],
+                    "worked_examples": [
+                        {
+                            "title": "Finding Asymptotes of a Rational Function",
+                            "content": "Problem: Find the vertical and horizontal asymptotes of R(x) = (2x + 1) / (x - 3).\nMethod:\n1. Vertical asymptote: set denominator to zero: x - 3 = 0 => x = 3.\n2. Degrees of numerator and denominator are equal (1 and 1).\n3. Horizontal asymptote is ratio of leading coefficients: y = 2/1 = 2.\nConclusion: Vertical asymptote at x = 3, horizontal asymptote at y = 2."
+                        }
+                    ],
+                    "misconceptions": [
+                        {"trap": "Assuming every denominator zero creates a vertical asymptote", "correction": "Zeros that cancel with numerator factors create removable discontinuities (holes), not vertical asymptotes."}
+                    ],
+                }
+            elif "exponential" in title_l or "logarithm" in title_l:
+                formulations = [
+                    {
+                        "title": "Continuous Exponential Growth & Decay",
+                        "formula": "A(t) = A₀ e^(kt),   where k > 0 (growth), k < 0 (decay)",
+                        "derivation": "Solution to the differential rate equation dA/dt = kA.",
+                        "variables": "A₀ = initial quantity; k = continuous rate constant; t = elapsed time.",
+                    },
+                    {
+                        "title": "Logarithm Fundamental Inversion & Product Law",
+                        "formula": "log_b(xy) = log_b(x) + log_b(y),   b^(log_b(x)) = x",
+                        "derivation": "Exponent rules translated under the logarithmic bijection.",
+                        "variables": "b = positive base (b ≠ 1); x, y = positive real arguments.",
+                    }
+                ]
+                return {
+                    "principles": grounded_principles if len(grounded_principles) >= 2 else [
+                        {"title": "Exponential Base Scaling", "content": f"{chapter_title} models phenomena where rate of change is directly proportional to current magnitude.", "tag": "Core Axiom"},
+                        {"title": "Logarithmic Domain Constraint", "content": "Logarithmic functions are strictly defined only for positive arguments (x > 0) in the real number system.", "tag": "Boundary Condition"},
+                    ],
+                    "formulations": grounded_formulations if len(grounded_formulations) >= 2 else formulations,
+                    "mental_models": [
+                        {"concept": "Scale Multiplier vs. Additive Steps", "analogy": "Exponential growth multiplies quantities in equal time intervals, while logarithms compress multiplicative spans into additive steps.", "takeaway": "Logarithms linearize exponential data for analytical tractability."}
+                    ],
+                    "worked_examples": [
+                        {
+                            "title": "Solving an Exponential Equation Using Natural Logs",
+                            "content": "Problem: Solve 5 e^(2x) = 20.\nMethod:\n1. Divide both sides by 5: e^(2x) = 4.\n2. Take natural logarithm of both sides: ln(e^(2x)) = ln(4).\n3. Simplify LHS: 2x = ln(4).\n4. Divide by 2: x = ln(4) / 2 = ln(2) ≈ 0.693.\nConclusion: Solution is x = ln(2)."
+                        }
+                    ],
+                    "misconceptions": [
+                        {"trap": "Distributing logarithms across sums: log(x + y) ≠ log(x) + log(y)", "correction": "Logarithms convert products to sums (log(xy) = log x + log y); they do not distribute across addition."}
+                    ],
+                }
+            elif "trigonometr" in title_l or "circle" in title_l or "periodic" in title_l:
+                formulations = [
+                    {
+                        "title": "Pythagorean Trigonometric Invariant",
+                        "formula": "sin²(θ) + cos²(θ) = 1,   tan²(θ) + 1 = sec²(θ)",
+                        "derivation": "Direct mapping of the unit circle equation x² + y² = 1 with x = cos(θ), y = sin(θ).",
+                        "variables": "θ = angle measured in radians or degrees.",
+                    },
+                    {
+                        "title": "Periodic Sinusoidal Model",
+                        "formula": "y = A sin(B(x - C)) + D,   Period T = 2π / |B|",
+                        "derivation": "Harmonic oscillation parametrized by amplitude, frequency, and phase translation.",
+                        "variables": "|A| = amplitude; 2π/|B| = wavelength/period; C = phase shift; D = midline vertical shift.",
+                    }
+                ]
+                return {
+                    "principles": grounded_principles if len(grounded_principles) >= 2 else [
+                        {"title": "Circular Invariance & Angle Periodicity", "content": f"{chapter_title} projects circular geometric rotation onto rectilinear coordinate axes with period 2π.", "tag": "Core Axiom"},
+                        {"title": "Radian Metric Coherence", "content": "Radian angle measure directly equates arc length s to radius r via s = rθ, making calculus derivations dimensionless.", "tag": "Geometric Invariant"},
+                    ],
+                    "formulations": grounded_formulations if len(grounded_formulations) >= 2 else formulations,
+                    "mental_models": [
+                        {"concept": "Rotating Unit Phasor", "analogy": "Envision an arm rotating on a bicycle wheel: height above axle is sine, horizontal distance is cosine, and full cycles repeat every 2π radians.", "takeaway": "All trigonometric identities originate from the geometry of the unit circle."}
+                    ],
+                    "worked_examples": [
+                        {
+                            "title": "Evaluating Exact Values via Unit Circle Geometry",
+                            "content": "Problem: Find the exact values of sin(5π/6) and cos(5π/6).\nMethod:\n1. Identify reference angle: π - 5π/6 = π/6 (30°).\n2. Sine of π/6 is 1/2; cosine of π/6 is √3/2.\n3. In Quadrant II (5π/6), x is negative and y is positive.\nConclusion: sin(5π/6) = 1/2 and cos(5π/6) = -√3/2."
+                        }
+                    ],
+                    "misconceptions": [
+                        {"trap": "Treating degrees and radians interchangeably in formula arguments", "correction": "Formulas involving arc length and analytical derivatives require arguments in radians, not degrees."}
+                    ],
+                }
+            elif "calculus" in subj or "limit" in title_l or "deriv" in title_l or "integr" in title_l:
+                formulations = [
+                    {
+                        "title": "Formal Definition of the Derivative",
+                        "formula": "f'(x) = lim_{h -> 0} [f(x + h) - f(x)] / h",
+                        "derivation": "Limiting value of secant slope as interval separation h converges to zero.",
+                        "variables": "f'(x) = instantaneous rate of change; h = infinitesimal perturbation.",
+                    },
+                    {
+                        "title": "Fundamental Theorem of Calculus",
+                        "formula": "∫ₐᵇ f(x) dx = F(b) - F(a),   where F'(x) = f(x)",
+                        "derivation": "Connects infinitesimal accumulation (integration) with rate of change (differentiation) as inverse operations.",
+                        "variables": "f = continuous integrand; F = antiderivative; a, b = integration bounds.",
+                    }
+                ]
+                return {
+                    "principles": grounded_principles if len(grounded_principles) >= 2 else [
+                        {"title": "Local Linearity & Instantaneous Rate", "content": f"{chapter_title} establishes how continuous smooth curves are approximated by tangent linear manifolds locally.", "tag": "Core Axiom"},
+                        {"title": "Continuity as Precondition for Differentiability", "content": "Differentiability implies continuity, but continuity does not guarantee differentiability at cusps or corners.", "tag": "Foundational Theorem"},
+                    ],
+                    "formulations": grounded_formulations if len(grounded_formulations) >= 2 else formulations,
+                    "mental_models": [
+                        {"concept": "Microscopic Zoom Linearity", "analogy": "Zoom in infinitely close on a differentiable curve: eventually it looks indistinguishable from a straight tangent line.", "takeaway": "Derivatives capture the exact slope of this localized line."}
+                    ],
+                    "worked_examples": [
+                        {
+                            "title": "Computing Derivative from First Principles",
+                            "content": "Problem: Compute the derivative of f(x) = x².\nMethod:\n1. Form difference quotient: [(x + h)² - x²] / h.\n2. Expand numerator: [x² + 2xh + h² - x²] / h = [2xh + h²] / h.\n3. Factor out h: h(2x + h) / h = 2x + h (for h ≠ 0).\n4. Take limit as h -> 0: lim_{h -> 0} (2x + h) = 2x.\nConclusion: f'(x) = 2x."
+                        }
+                    ],
+                    "misconceptions": [
+                        {"trap": "Assuming continuous functions are always differentiable", "correction": "Functions with sharp corners (like f(x) = |x| at x=0) are continuous everywhere but lack a unique tangent slope."}
+                    ],
+                }
+
+        elif "phys" in subj or "mech" in subj:
+            formulations = [
+                {
+                    "title": "Newton's Second Law & Momentum Formulation",
+                    "formula": "Σ F = m a = dp / dt,   where p = m v",
+                    "derivation": "Net external force produces proportional acceleration in an inertial reference frame.",
+                    "variables": "Σ F = net vector force (N); m = inertial mass (kg); a = acceleration (m/s²); p = momentum (kg·m/s).",
+                },
+                {
+                    "title": "Work-Energy Theorem & Conservation Invariant",
+                    "formula": "W_net = ΔK = (1/2) m v_f² - (1/2) m v_i²,   E_tot = K + U = const",
+                    "derivation": "Line integral of force along displacement equates to change in translational kinetic energy.",
+                    "variables": "W = work (J); K = kinetic energy; U = potential energy; v = velocity (m/s).",
+                }
+            ]
             return {
-                "principles": [
-                    {"title": "Primary Governing Principle", "content": principles_a, "tag": "Core Axiom"},
-                    {"title": "Operational Domain & Assumptions", "content": principles_b, "tag": "Mechanics"},
+                "principles": grounded_principles if len(grounded_principles) >= 2 else [
+                    {"title": "Conservation Laws & Reference Frames", "content": f"{chapter_title} formulates physical invariants that remain constant under closed system transformations.", "tag": "Core Axiom"},
+                    {"title": "Superposition of Forces", "content": "Multiple forces acting on a point body combine vectorially according to Euclidean vector addition.", "tag": "Vector Invariant"},
                 ],
-                "formulations": [
-                    {"title": "Governing Formulation", "formula": formulation, "derivation": "Derived from foundational conservation and symmetry principles.", "variables": "State variables, proportionalities, and physical boundary constraints."}
-                ],
+                "formulations": grounded_formulations if len(grounded_formulations) >= 2 else formulations,
                 "mental_models": [
-                    {"concept": "Dynamical System Model", "analogy": f"Think of {chapter_title} as a system where every action produces a measurable, rule-bound response.", "takeaway": "Identify the invariants and conserved quantities first."}
-                ],
-                "misconceptions": [
-                    {"trap": "Applying an equation outside its stated assumptions", "correction": "Always establish the operational domain, reference frame, and parameter validity before calculating."}
-                ],
-            }
-        elif "math" in subj or "calc" in subj or "algebra" in subj:
-            principles_a = f"{c1}" if c1 else f"{chapter_title} formalises a precise transformation rule connecting mathematical objects."
-            principles_b = f"{c2}" if c2 else "The chapter develops the notation, axioms, and procedural steps necessary to apply and invert the rule reliably."
-            formulation = c_formula or "The defining rule expresses the relationship between the mathematical entities under study."
-            return {
-                "principles": [
-                    {"title": "Defining Rule", "content": principles_a, "tag": "Core Axiom"},
-                    {"title": "Procedural Framework", "content": principles_b, "tag": "Procedure"},
-                ],
-                "formulations": [
-                    {"title": "Core Formulation", "formula": formulation, "derivation": "Derived by applying the defining axioms to the canonical cases.", "variables": "Symbols denote the mathematical objects and operators of the rule."}
-                ],
-                "mental_models": [
-                    {"concept": "Transformation View", "analogy": "Treat the rule as a machine that maps an input expression to a canonical output expression.", "takeaway": "Every rule has an inverse or a boundary — know both."}
-                ],
-                "misconceptions": [
-                    {"trap": "Applying the rule in reverse order or outside its domain", "correction": "Verify preconditions and order of operations before applying any transformation."}
-                ],
-            }
-        elif "bio" in subj or "chem" in subj or "life" in subj:
-            principles_a = f"{c1}" if c1 else f"{chapter_title} explains a biological/chemical process through interacting components and pathways."
-            principles_b = f"{c2}" if c2 else "Systems-level behavior emerges from the collective action of the individual components described below."
-            formulation = c_formula or "The central relationship ties together the quantities that characterise the process."
-            return {
-                "principles": [
-                    {"title": "Governing Process", "content": principles_a, "tag": "Core Axiom"},
-                    {"title": "Emergent Behaviour", "content": principles_b, "tag": "System"},
-                ],
-                "formulations": [
-                    {"title": "Central Relationship", "formula": formulation, "derivation": "Observed from controlled experiments and quantitative measurement.", "variables": "Variables represent measurable quantities of the process."}
-                ],
-                "mental_models": [
-                    {"concept": "Pathway Feedback Model", "analogy": f"Understand {chapter_title} as a cascade where each layer regulates the next.", "takeaway": "Trace inputs to outputs and look for feedback loops."}
-                ],
-                "misconceptions": [
-                    {"trap": "Assuming static equilibrium instead of dynamic balance", "correction": "Living systems maintain steady states through continuous input, output, and regulation."}
-                ],
-            }
-        elif "comput" in subj or "data" in subj or "software" in subj or "algorithm" in subj or "cs" in subj:
-            principles_a = f"{c1}" if c1 else f"{chapter_title} establishes the fundamental computational principles, formal models of computation, and architectural abstractions that govern data transformations."
-            principles_b = f"{c2}" if c2 else "Algorithmic correctness and asymptotic efficiency are derived from structural invariants, boundary termination proofs, and resource guarantees."
-            formulation = c_formula or "T(n) = O(f(n)) and S(n) = O(g(n)) governing time and space resource scaling over input cardinality n."
-            return {
-                "principles": [
-                    {"title": "Foundational Computational Paradigm", "content": principles_a, "tag": "Core Axiom"},
-                    {"title": "System Invariants & Boundary Guarantees", "content": principles_b, "tag": "Invariant"},
-                ],
-                "formulations": [
-                    {"title": "Algorithmic Complexity & State Bounds", "formula": formulation, "derivation": "Derived from formal recurrences and inductive verification across discrete state transitions.", "variables": "n = problem dimension; T(n) = operation count; S(n) = auxiliary memory allocations."}
-                ],
-                "mental_models": [
-                    {"concept": "State Machine View", "analogy": "Treat the process as a state machine stepping through allowed transitions.", "takeaway": "Invariants guarantee correctness across all state cycles; transition steps determine computational cost."}
+                    {"concept": "Energy Accounting Ledger", "analogy": "Energy cannot be created or destroyed, only transferred: like a strictly balanced accounting ledger, every expenditure in potential energy appears as kinetic energy or work.", "takeaway": "Establish the initial vs. final state before writing equations."}
                 ],
                 "worked_examples": [
                     {
-                        "title": f"State Transition Analysis: {chapter_title}",
-                        "content": f"Problem: Verify structural invariants and boundary conditions for {chapter_title}.\nMethod:\n1. Identify input domain, preconditions, and base cases.\n2. Execute state transitions step-by-step while verifying inductive invariant holds.\n3. Validate termination condition and output post-conditions.\nConclusion: Invariant holds across every cycle, confirming deterministic correctness."
+                        "title": "Kinematic Motion Under Constant Gravitational Acceleration",
+                        "content": "Problem: A ball is dropped from a height of 20 m. Find its velocity just before impact (g = 9.8 m/s²).\nMethod:\n1. Use kinematic equation: v² = v₀² + 2a(y - y₀).\n2. Given: v₀ = 0, a = 9.8 m/s², Δy = 20 m.\n3. Compute: v² = 0 + 2(9.8)(20) = 392.\n4. Take square root: v = √392 ≈ 19.8 m/s.\nConclusion: Final velocity is approximately 19.8 m/s downward."
                     }
                 ],
                 "misconceptions": [
-                    {"trap": "Confusing best-case or average-case observations with worst-case asymptotic bounds", "correction": "State the operational domain with respect to adversarial input size and verify boundary conditions before concluding complexity."}
+                    {"trap": "Treating vectors like scalar quantities without resolving directional components", "correction": "Forces and velocities along orthogonal axes (x and y) must be solved independently."}
                 ],
             }
 
-        # Generic
+        elif "bio" in subj or "chem" in subj or "life" in subj:
+            formulations = [
+                {
+                    "title": "Equilibrium Constant & Reaction Quotient",
+                    "formula": "K_eq = ([C]^c [D]^d) / ([A]^a [B]^b),   ΔG° = -RT ln(K_eq)",
+                    "derivation": "Law of mass action derived from thermodynamic chemical potential minimization.",
+                    "variables": "K_eq = equilibrium ratio; [X] = molar concentrations; R = gas constant; T = absolute temperature.",
+                }
+            ]
+            return {
+                "principles": grounded_principles if len(grounded_principles) >= 2 else [
+                    {"title": "Homeostasis and Dynamic Equilibrium", "content": f"{chapter_title} describes how biological and chemical systems maintain stable internal states through continuous regulatory feedbacks.", "tag": "Core Axiom"},
+                    {"title": "Structure-Function Relationship", "content": "Molecular conformation and macroscopic architecture dictate operational biological activity and catalytic specificity.", "tag": "Biological Principle"},
+                ],
+                "formulations": grounded_formulations if len(grounded_formulations) >= 1 else formulations,
+                "mental_models": [
+                    {"concept": "Lock-and-Key Regulatory Circuit", "analogy": "Biological pathways operate like interconnected relays: specific molecular keys trigger specific locks, propagating regulatory signals.", "takeaway": "Trace the cascade from molecular trigger to systemic response."}
+                ],
+                "worked_examples": [
+                    {
+                        "title": "Predicting Equilibrium Shift via Le Chatelier's Principle",
+                        "content": "Problem: For the exothermic reaction N₂(g) + 3H₂(g) ⇌ 2NH₃(g) + heat, predict the shift if temperature is increased.\nMethod:\n1. Le Chatelier's principle states a system responds to relieve applied stress.\n2. Heat is a product in this exothermic reaction.\n3. Increasing temperature adds stress to the product side.\nConclusion: Equilibrium shifts to the left (toward reactants) to consume excess thermal energy."
+                    }
+                ],
+                "misconceptions": [
+                    {"trap": "Confusing dynamic equilibrium with a static cessation of reactions", "correction": "At dynamic equilibrium, forward and reverse reactions proceed continuously at identical rates."}
+                ],
+            }
+
+        elif "comput" in subj or "data" in subj or "software" in subj or "algorithm" in subj or "cs" in subj:
+            formulations = [
+                {
+                    "title": "Asymptotic Complexity & Big-O Recurrence",
+                    "formula": "T(n) = a T(n/b) + O(n^d),   T(n) ∈ O(f(n))",
+                    "derivation": "Master theorem for divide-and-conquer recurrences bounding operational scaling.",
+                    "variables": "a = subproblem count; b = division factor; d = recombination exponent; n = input cardinality.",
+                }
+            ]
+            return {
+                "principles": grounded_principles if len(grounded_principles) >= 2 else [
+                    {"title": "Computational Invariants & State Guarantees", "content": f"{chapter_title} establishes deterministic state transformations and invariants that hold across all execution cycles.", "tag": "Core Axiom"},
+                    {"title": "Asymptotic Resource Scaling", "content": "Efficiency is measured against input size n as n -> ∞, abstracting hardware differences.", "tag": "Complexity Axiom"},
+                ],
+                "formulations": grounded_formulations if len(grounded_formulations) >= 1 else formulations,
+                "mental_models": [
+                    {"concept": "State Machine Induction", "analogy": "Treat an algorithm as an inductive ladder: prove the base case holds, then ensure every step preserves the invariant to reach guaranteed termination.", "takeaway": "Invariants guarantee correctness; transition steps dictate runtime."}
+                ],
+                "worked_examples": [
+                    {
+                        "title": "Verifying Binary Search Loop Invariant",
+                        "content": "Problem: Prove binary search terminates with the correct index in O(log n) steps.\nMethod:\n1. Loop invariant: If key is in array A, it lies within A[low..high].\n2. Initialization: low=0, high=n-1 covers entire array.\n3. Maintenance: mid=(low+high)//2; narrowing eliminates half the search space while preserving the invariant.\n4. Termination: Search terminates when low > high (element not present) or A[mid] == key.\nConclusion: Space halves each iteration, bounding runtime to O(log n)."
+                        }
+                ],
+                "misconceptions": [
+                    {"trap": "Confusing best-case observations with worst-case asymptotic bounds", "correction": "Big-O characterizes the asymptotic upper bound under worst-case inputs, not optimistic runtime."}
+                ],
+            }
+
+        # General STEM fallback
         return {
-            "principles": [
-                {"title": "Primary Governing Principle", "content": c1 or f"{chapter_title} establishes the foundational rules and relationships of the topic.", "tag": "Core Axiom"},
-                {"title": "Analytical Mechanics", "content": c2 or "Real scenarios are modelled by stating assumptions, identifying quantities, and applying the governing relationship.", "tag": "Mechanics"},
+            "principles": grounded_principles if len(grounded_principles) >= 2 else [
+                {"title": "Primary Governing Principle", "content": c1 or f"{chapter_title} establishes the foundational definitions, empirical relationships, and analytical rules of its domain.", "tag": "Core Axiom"},
+                {"title": "Operational Boundaries & Invariants", "content": c2 or "Analytical methods apply strictly within verified boundary conditions, conservation constraints, and stated domain assumptions.", "tag": "Mechanics"},
             ],
-            "formulations": [
-                {"title": "Governing Formulation", "formula": c_formula or "The governing equation links the state variables of the system.", "derivation": "Derived from foundational principles of the domain.", "variables": "State variables and physical boundary constraints."}
+            "formulations": grounded_formulations if len(grounded_formulations) >= 1 else [
+                {"title": "Governing Analytical Formulation", "formula": c_formula or "y = f(x₁, x₂, ..., xₙ) maps domain variables to system observables.", "derivation": "Derived from foundational conservation and symmetry principles.", "variables": "State variables, parameters, and boundary constraints."}
             ],
             "mental_models": [
-                {"concept": "Conservation & Equilibrium Model", "analogy": f"Think of {chapter_title} as a dynamic system governed by conservation constraints.", "takeaway": "Track invariants, boundary limits, and energy conservation."}
+                {"concept": "Conserved Dynamic System", "analogy": f"Treat {chapter_title} as an interconnected system governed by balancing constraints: any change to one variable propagates predictable adjustments to maintain system invariants.", "takeaway": "Identify the conserved quantities and boundary conditions before solving."}
+            ],
+            "worked_examples": [
+                {
+                    "title": f"Structured Problem Walkthrough: {chapter_title}",
+                    "content": f"Problem: Apply governing relationships for {chapter_title}.\nMethod:\n1. Identify given parameters and target variables.\n2. Verify boundary conditions and domain constraints.\n3. Apply transformation rules systematically while preserving system balance.\nConclusion: Result satisfies all defining constraints."
+                }
             ],
             "misconceptions": [
-                {"trap": "Applying equations outside their operational validity bounds", "correction": "Always establish the operational domain and physical assumptions prior to calculation."}
+                {"trap": "Applying governing formulas outside their operational assumptions", "correction": "Always establish reference frames, domain restrictions, and parameter validity before computing."}
             ],
         }
 # ------------------------------------------------------------------ #
@@ -977,6 +1364,14 @@ class QuestionGeneratorEngine:
             words.pop()
         if not words or len(words) > 6:
             return ""
+        junk_concept_words = {
+            "solution", "example", "exercise", "figure", "table", "chapter", "section",
+            "problem", "try it", "check", "note", "remember", "warning", "tip", "summary",
+            "caroline", "tracie", "john", "mary", "step", "part", "case", "page"
+        }
+        low_words = [w.lower() for w in words]
+        if any(w in junk_concept_words for w in low_words):
+            return ""
         concept = " ".join(words)
         if len(concept) < 3 or len(concept) > 60:
             return ""
@@ -1006,7 +1401,7 @@ class QuestionGeneratorEngine:
         #    The leading look-behind + capitalised start prevent mid-word hits
         #    like "…co[ntributed to the formation…]".
         def_pattern = re.compile(
-            r"(?<![A-Za-z])([A-Z][A-Za-z0-9'\-]{1,40}(?:\s+[A-Za-z0-9'\-]{1,40}){0,5})\s+"
+            r"(?<![A-Za-z])([A-Z][A-Za-z0-9'\-]{1,40}(?:[ \t]+[A-Za-z0-9'\-]{1,40}){0,5})\s+"
             r"(?:states\s+that|is\s+defined\s+as|are\s+defined\s+as|refers\s+to|"
             r"describes\s+how|describes\s+the|describes|is\s+called|are\s+called|"
             r"is\s+the|are\s+the|represents|signifies|is\s+an?)\s+"
@@ -1039,9 +1434,17 @@ class QuestionGeneratorEngine:
 
             rhs = raw_rhs.rstrip(")}].;, \t").strip()
             if lhs and rhs and len(rhs) >= 1:
-                low = lhs.lower()
-                if not any(kw in low for kw in ("http", "www", "chapter", "is ", "solution")):
-                    facts.append({"type": "equation", "lhs": lhs, "rhs": rhs, "full": f"{lhs} = {rhs}"})
+                # Reject trivial assignment roots (e.g. x = 0, y = 0) and unclosed parens
+                if re.match(r"^[a-zA-Z]\s*=\s*\d+$", f"{lhs} = {rhs}"):
+                    continue
+                if rhs.count("(") != rhs.count(")"):
+                    continue
+                low_lhs = lhs.lower()
+                low_rhs = rhs.lower()
+                junk_words = ("http", "www", "chapter", "is ", "solution", "calculator", "menu", "graph", "figure", "table", "after", "before", "function of", "diameter", "use", "the", "we", "can", "then", "from", "that", "with")
+                if any(kw in low_lhs for kw in junk_words) or any(kw in low_rhs for kw in junk_words):
+                    continue
+                facts.append({"type": "equation", "lhs": lhs, "rhs": rhs, "full": f"{lhs} = {rhs}"})
             if len(facts) >= 12:
                 break
 
