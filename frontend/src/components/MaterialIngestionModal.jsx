@@ -52,6 +52,7 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
   const [elapsedSec, setElapsedSec] = useState(0);
   const [errorMsg, setErrorMsg] = useState(null);
   const [successCourse, setSuccessCourse] = useState(null);
+  const [readyCourse, setReadyCourse] = useState(null);
 
   const fileInputRef = useRef(null);
   const pollIntervalRef = useRef(null);
@@ -115,6 +116,9 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
           if (job.current_step) setProcessingStep(job.current_step);
           if (job.current_message) setStatusMessage(job.current_message);
           if (typeof job.progress === 'number') setProgressPercent(job.progress);
+          if (job.course || job.course_ready) {
+            setReadyCourse(job.course || null);
+          }
           if (typeof job.chapters_total === 'number' || typeof job.chapters_enriched === 'number') {
             setEnrichProgress({
               total: job.chapters_total || 0,
@@ -130,6 +134,7 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
           setProgressPercent(100);
           setStatusMessage('Course successfully created! Initializing study workspace...');
           setSuccessCourse(job.course);
+          setReadyCourse(null);
 
           setTimeout(() => {
             setIsProcessing(false);
@@ -386,12 +391,38 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
                   </div>
                 </div>
               )}
+              {/* Instant Skeleton Ready Action Banner */}
+              {readyCourse && (
+                <div className="w-full max-w-md mb-4 p-3.5 rounded-2xl bg-olive-500/15 border border-olive-500/40 flex items-center justify-between gap-3 text-left animate-fadeIn shadow-japandi-sm">
+                  <div className="min-w-0">
+                    <span className="text-xs font-mono font-bold text-olive-300 block flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-olive-400" />
+                      Instant Skeleton Published (~1-2s)
+                    </span>
+                    <span className="text-xs text-sand-200 mt-0.5 block">
+                      All {readyCourse.chapters?.length || 1} chapters are ready to study immediately!
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+                      setIsProcessing(false);
+                      setProcessingStep(0);
+                      if (onIngestionSuccess) onIngestionSuccess(readyCourse);
+                    }}
+                    className="px-4 py-2 rounded-xl bg-olive-600 hover:bg-olive-500 text-white font-bold text-xs uppercase tracking-wider shadow shrink-0 transition active:scale-95"
+                  >
+                    Study Now
+                  </button>
+                </div>
+              )}
+
               <div className="w-full max-w-md mb-5">
-                <div className="flex justify-between items-center text-[10px] font-mono text-sand-400 mb-1 px-1">
+                <div className="flex justify-between items-center text-xs font-mono text-sand-400 mb-1 px-1">
                   <span>Pipeline Progress</span>
                   <span className="font-bold text-clay-400">{progressPercent || (processingStep * 20)}%</span>
                 </div>
-                <div className="w-full bg-sand-950 rounded-full h-2 overflow-hidden border border-sand-800/80">
+                <div className="w-full bg-sand-950 rounded-full h-2.5 overflow-hidden border border-sand-800/80">
                   <div 
                     className="h-full bg-gradient-to-r from-clay-500 to-ember-500 rounded-full transition-all duration-500" 
                     style={{ width: `${Math.min(100, Math.max(8, progressPercent || (processingStep * 20)))}%` }}
@@ -409,7 +440,7 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
                   return (
                     <div 
                       key={idx}
-                      className={`flex items-center justify-between p-3 rounded-xl border transition-all duration-300 ${
+                      className={`flex items-center justify-between p-3.5 rounded-xl border transition-all duration-300 ${
                         isDone 
                           ? 'bg-olive-500/10 border-olive-500/30 text-olive-300' 
                           : isCurrent 
@@ -418,7 +449,7 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <div className={`p-1.5 rounded-lg ${
+                        <div className={`p-2 rounded-lg ${
                           isDone ? 'bg-olive-500/20 text-olive-400' : isCurrent ? 'bg-clay-500/20 text-clay-400' : 'bg-sand-800 text-sand-600'
                         }`}>
                           {isDone ? (
@@ -430,21 +461,21 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
                           )}
                         </div>
                         <div>
-                          <div className="text-xs font-semibold">{step.label}</div>
-                          <div className="text-[10px] text-sand-400">{step.desc}</div>
+                          <div className="text-sm font-semibold">{step.label}</div>
+                          <div className="text-xs text-sand-400">{step.desc}</div>
                         </div>
                       </div>
 
-                      {isDone && <span className="text-[10px] font-mono text-olive-400 font-bold">Done</span>}
-                      {isCurrent && <span className="text-[10px] font-mono text-clay-400 font-bold animate-pulse">In Progress...</span>}
+                      {isDone && <span className="text-xs font-mono text-olive-400 font-bold">Done</span>}
+                      {isCurrent && <span className="text-xs font-mono text-clay-400 font-bold animate-pulse">In Progress...</span>}
                     </div>
                   );
                 })}
               </div>
 
               {elapsedSec > 10 && !successCourse && (
-                <p className="text-[11px] text-sand-500 font-mono italic max-w-md">
-                  💡 Processing extensive multi-page textbook/paper. Generating high-retention flashcards and embedding vector database...
+                <p className="text-xs text-sand-400 font-mono italic max-w-md">
+                  💡 Processing multi-page textbook/paper. Generating high-retention flashcards and embedding vector database...
                 </p>
               )}
 
@@ -459,8 +490,8 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
             /* Input Form */
             <form onSubmit={handleSubmit} className="space-y-5">
               {errorMsg && (
-                <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-700 text-xs">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <div className="flex items-center gap-2 p-3 bg-clay-500/15 border border-clay-500/40 rounded-xl text-clay-300 text-xs">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 text-clay-400" />
                   <span>{errorMsg}</span>
                 </div>
               )}

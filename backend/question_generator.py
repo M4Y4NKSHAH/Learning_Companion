@@ -307,6 +307,31 @@ class QuestionGeneratorEngine:
 # ------------------------------------------------------------------ #
     # Local Llama phases
     # ------------------------------------------------------------------ #
+    @staticmethod
+    def _prepare_chapter_context(text: str, max_chars: int = 7500) -> str:
+        """
+        Extracts a comprehensive, high-signal multi-section text window up to max_chars.
+        Samples the opening foundations (45%), central analytical core (35%),
+        and concluding synthesis/worked examples (20%) so the LLM synthesizes
+        complete, rigorous theory rather than a shallow 2-sentence summary.
+        """
+        if not text:
+            return ""
+        clean = text.strip()
+        if len(clean) <= max_chars:
+            return clean
+
+        head_len = int(max_chars * 0.45)
+        mid_len = int(max_chars * 0.35)
+        tail_len = max_chars - head_len - mid_len
+
+        head = clean[:head_len]
+        mid_start = max(head_len, (len(clean) - mid_len) // 2)
+        mid = clean[mid_start: mid_start + mid_len]
+        tail = clean[-tail_len:]
+
+        return f"{head}\n\n[... Core Section Analysis ...]\n\n{mid}\n\n[... Key Applications & Review ...]\n\n{tail}"
+
     def _local_synthesize_unified(
         self,
         title: str,
@@ -316,8 +341,8 @@ class QuestionGeneratorEngine:
         chapter_index: int,
         include_cards: bool = True,
     ) -> Optional[Dict[str, Any]]:
-        """Unified Phase A+B: single structured local-Llama call for blueprint AND cards."""
-        ctx = text[:2600]
+        """Unified Phase A+B: single structured local-Llama call for blueprint AND cards with rich context."""
+        ctx = self._prepare_chapter_context(text, max_chars=7500)
         card_schema = (
             '\n  "cards": [\n'
             f'    {{"topic": "{title}", "question": "conceptual question", "answer": "• Core Principle: ...\\n• Mechanism: ..."}},\n'
@@ -329,24 +354,25 @@ class QuestionGeneratorEngine:
         prompt = (
             f"SUBJECT: {subject} | LEARNER TIER: {tier}\n"
             f"CHAPTER {chapter_index}: {title}\n\n"
-            f"SOURCE TEXT:\n\"\"\"{ctx}\"\"\"\n\n"
+            f"SOURCE TEXT (Comprehensive Chapter Excerpt):\n\"\"\"{ctx}\"\"\"\n\n"
             "Return a JSON object with EXACTLY these keys and shapes:\n"
             "{\n"
-            '  "summary": "2-3 sentence rigorous synthesis of the governing principles",' + card_schema + '\n'
-            '  "objectives": ["Objective 1", "Objective 2", "Objective 3"],\n'
-            '  "principles": [{"title": "name", "content": "definition/axiom", "tag": "Core Axiom|Law|Definition"}],\n'
-            '  "formulations": [{"title": "name", "formula": "equation", "derivation": "how it follows", "variables": "meaning of symbols"}],\n'
-            '  "mental_models": [{"concept": "name", "analogy": "intuitive everyday analogy", "takeaway": "one-sentence insight"}],\n'
-            '  "misconceptions": [{"trap": "common student error", "correction": "why it is wrong"}]\n'
+            '  "summary": "Deep, rigorous 3-4 sentence comprehensive academic synthesis detailing the primary thesis, governing computational/scientific mechanisms, and practical significance.",' + card_schema + '\n'
+            '  "objectives": ["Specific action-oriented objective (e.g. Master...)", "Analytical objective (e.g. Formulate...)", "Evaluative objective (e.g. Differentiate...)"],\n'
+            '  "principles": [{"title": "Precise Concept Name", "content": "Rigorous definition or governing law explaining operational mechanics", "tag": "Core Axiom|Governing Law|Definition"}],\n'
+            '  "formulations": [{"title": "Analytical Specification", "formula": "Governing equation, definition, or algorithmic invariant", "derivation": "Step-by-step reasoning or mathematical justification", "variables": "Precise breakdown of symbols, units, and operational boundaries"}],\n'
+            '  "mental_models": [{"concept": "Core Concept Name", "analogy": "Vivid, intuitive, real-world physical analogy explaining how the system behaves", "takeaway": "Actionable conceptual heuristic or invariant rule"}],\n'
+            '  "worked_examples": [{"title": "Concrete Worked Example", "content": "Step-by-step problem walkthrough from the chapter with given parameters, solution strategy, and conclusion"}],\n'
+            '  "misconceptions": [{"trap": "Common student misconception or procedural pitfall", "correction": "Deep conceptual correction explaining why the intuition fails and what to verify"}]\n'
             "}\n"
-            "Base every string strictly on the source text. No markdown fences, no extra keys."
+            "Base every string strictly on the source text. Provide thorough, educational depth. No markdown fences, no extra keys."
         )
         parsed = self.local_llm.generate_structured_json(
             prompt=prompt,
             system_prompt=self.JSON_ONLY_SYSTEM,
             temperature=0.2,
-            max_tokens=1000,
-            timeout=90,
+            max_tokens=1800,
+            timeout=120,
         )
         if isinstance(parsed, dict) and "summary" in parsed:
             return parsed
@@ -360,28 +386,29 @@ class QuestionGeneratorEngine:
         tier: str,
         chapter_index: int,
     ) -> Optional[Dict[str, Any]]:
-        """Phase A: one structured local-Llama call for the theory blueprint."""
-        ctx = text[:2800]
+        """Phase A: one structured local-Llama call for the theory blueprint with rich multi-section context."""
+        ctx = self._prepare_chapter_context(text, max_chars=7500)
         prompt = (
             f"SUBJECT: {subject} | LEARNER TIER: {tier}\n"
             f"CHAPTER {chapter_index}: {title}\n\n"
-            f"SOURCE TEXT:\n\"\"\"{ctx}\"\"\"\n\n"
+            f"SOURCE TEXT (Comprehensive Chapter Excerpt):\n\"\"\"{ctx}\"\"\"\n\n"
             "Return a JSON object with EXACTLY these keys and shapes:\n"
             "{\n"
-            '  "summary": "2-3 sentence rigorous synthesis of the governing principles",\n'
-            '  "objectives": ["3 distinct learning objectives"],\n'
-            '  "principles": [{"title": "name", "content": "definition/axiom", "tag": "Core Axiom|Law|Definition"}, {"title": "...", "content": "...", "tag": "..."}],\n'
-            '  "formulations": [{"title": "name", "formula": "equation", "derivation": "how it follows from first principles", "variables": "meaning of each symbol"}],\n'
-            '  "mental_models": [{"concept": "name", "analogy": "intuitive everyday analogy", "takeaway": "one-sentence insight"}],\n'
-            '  "misconceptions": [{"trap": "common student error", "correction": "why it is wrong"}]\n'
+            '  "summary": "Deep, rigorous 3-4 sentence comprehensive academic synthesis detailing the primary thesis, governing computational/scientific mechanisms, and practical significance.",\n'
+            '  "objectives": ["Specific action-oriented objective (e.g. Master...)", "Analytical objective (e.g. Formulate...)", "Evaluative objective (e.g. Differentiate...)"],\n'
+            '  "principles": [{"title": "Precise Concept Name", "content": "Rigorous definition or governing law explaining operational mechanics", "tag": "Core Axiom|Governing Law|Definition"}],\n'
+            '  "formulations": [{"title": "Analytical Specification", "formula": "Governing equation, definition, or algorithmic invariant", "derivation": "Step-by-step reasoning or mathematical justification", "variables": "Precise breakdown of symbols, units, and operational boundaries"}],\n'
+            '  "mental_models": [{"concept": "Core Concept Name", "analogy": "Vivid, intuitive, real-world physical analogy explaining how the system behaves", "takeaway": "Actionable conceptual heuristic or invariant rule"}],\n'
+            '  "worked_examples": [{"title": "Concrete Worked Example", "content": "Step-by-step problem walkthrough from the chapter with given parameters, solution strategy, and conclusion"}],\n'
+            '  "misconceptions": [{"trap": "Common student misconception or procedural pitfall", "correction": "Deep conceptual correction explaining why the intuition fails and what to verify"}]\n'
             "}\n"
-            "Base every string strictly on the source text. No markdown, no extra keys."
+            "Base every string strictly on the source text. Provide thorough, educational depth. No markdown fences, no extra keys."
         )
         parsed = self.local_llm.generate_structured_json(
             prompt=prompt,
             system_prompt=self.JSON_ONLY_SYSTEM,
             temperature=0.2,
-            max_tokens=1200,
+            max_tokens=1800,
             timeout=120,
         )
         if isinstance(parsed, dict):
@@ -561,6 +588,19 @@ class QuestionGeneratorEngine:
                     })
             if cleaned:
                 deep["misconceptions"] = cleaned
+
+        # Worked examples from LLM
+        ex_items = self._coerce_list(blueprint.get("worked_examples"))
+        if ex_items:
+            existing_ex = list(deep.get("worked_examples", []))
+            for ex in ex_items:
+                if isinstance(ex, dict) and (ex.get("title") or ex.get("content")):
+                    existing_ex.append({
+                        "title": self._coerce_str(ex.get("title")) or "Worked Walkthrough",
+                        "content": self._coerce_str(ex.get("content")) or self._coerce_str(ex.get("solution")) or self._coerce_str(ex.get("explanation")),
+                    })
+            if existing_ex:
+                deep["worked_examples"] = existing_ex[:3]
 
         # Ground formulations with source equations when the LLM omitted/erred.
         if equations:
@@ -863,23 +903,29 @@ class QuestionGeneratorEngine:
                     {"trap": "Assuming static equilibrium instead of dynamic balance", "correction": "Living systems maintain steady states through continuous input, output, and regulation."}
                 ],
             }
-        elif "comput" in subj or "data" in subj or "software" in subj or "algorithm" in subj:
-            principles_a = f"{c1}" if c1 else f"{chapter_title} specifies a computational process over well-defined data structures."
-            principles_b = f"{c2}" if c2 else "Correctness and efficiency follow from the precise specification of the operations and their invariants."
-            formulation = c_formula or "The governing characterisation defines the input, output, and complexity of the process."
+        elif "comput" in subj or "data" in subj or "software" in subj or "algorithm" in subj or "cs" in subj:
+            principles_a = f"{c1}" if c1 else f"{chapter_title} establishes the fundamental computational principles, formal models of computation, and architectural abstractions that govern data transformations."
+            principles_b = f"{c2}" if c2 else "Algorithmic correctness and asymptotic efficiency are derived from structural invariants, boundary termination proofs, and resource guarantees."
+            formulation = c_formula or "T(n) = O(f(n)) and S(n) = O(g(n)) governing time and space resource scaling over input cardinality n."
             return {
                 "principles": [
-                    {"title": "Computational Specification", "content": principles_a, "tag": "Core Axiom"},
-                    {"title": "Correctness & Efficiency", "content": principles_b, "tag": "Invariant"},
+                    {"title": "Foundational Computational Paradigm", "content": principles_a, "tag": "Core Axiom"},
+                    {"title": "System Invariants & Boundary Guarantees", "content": principles_b, "tag": "Invariant"},
                 ],
                 "formulations": [
-                    {"title": "Formal Characterisation", "formula": formulation, "derivation": "Derived from the formal semantics of the defined operations.", "variables": "Symbols denote input spaces, output spaces, and resource bounds."}
+                    {"title": "Algorithmic Complexity & State Bounds", "formula": formulation, "derivation": "Derived from formal recurrences and inductive verification across discrete state transitions.", "variables": "n = problem dimension; T(n) = operation count; S(n) = auxiliary memory allocations."}
                 ],
                 "mental_models": [
-                    {"concept": "State Machine View", "analogy": "Treat the process as a state machine stepping through allowed transitions.", "takeaway": "Invariants make correctness provable; step count makes cost measurable."}
+                    {"concept": "State Machine View", "analogy": "Treat the process as a state machine stepping through allowed transitions.", "takeaway": "Invariants guarantee correctness across all state cycles; transition steps determine computational cost."}
+                ],
+                "worked_examples": [
+                    {
+                        "title": f"State Transition Analysis: {chapter_title}",
+                        "content": f"Problem: Verify structural invariants and boundary conditions for {chapter_title}.\nMethod:\n1. Identify input domain, preconditions, and base cases.\n2. Execute state transitions step-by-step while verifying inductive invariant holds.\n3. Validate termination condition and output post-conditions.\nConclusion: Invariant holds across every cycle, confirming deterministic correctness."
+                    }
                 ],
                 "misconceptions": [
-                    {"trap": "Confusing worst-case and average-case behaviour", "correction": "State the complexity class with respect to input size and measure the actual data distribution."}
+                    {"trap": "Confusing best-case or average-case observations with worst-case asymptotic bounds", "correction": "State the operational domain with respect to adversarial input size and verify boundary conditions before concluding complexity."}
                 ],
             }
 

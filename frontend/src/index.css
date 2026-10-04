@@ -12,13 +12,18 @@
        surface reads as layered handmade paper instead of flat white. No image assets. */
     background-color: #eae4d8;
     background-image:
-      radial-gradient(1200px 720px at 12% -12%, rgba(165, 98, 58, 0.07), transparent 62%),
-      radial-gradient(1000px 680px at 92% 108%, rgba(94, 122, 62, 0.06), transparent 60%);
+      radial-gradient(1200px 720px at 12% -12%, rgba(139, 90, 43, 0.09), transparent 64%),
+      radial-gradient(1000px 680px at 92% 108%, rgba(94, 122, 62, 0.09), transparent 62%),
+      radial-gradient(800px 500px at 50% 50%, rgba(168, 91, 86, 0.05), transparent 70%);
     background-attachment: fixed;
     color: #2b2723; /* sand-100 ink */
-    font-family: 'Outfit', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    font-family: Arial, "Helvetica Neue", Helvetica, ui-sans-serif, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: Arial, "Helvetica Neue", Helvetica, ui-sans-serif, system-ui, sans-serif;
   }
 
   /* Sumi-ink selection, paper text — quieter than a saturated accent block. */
@@ -119,11 +124,11 @@
 /* Washi paper panels: translucent rice paper + hairline ink edge + soft diffused shadow.
    Japandi avoids gloss, so the old heavy glassmorphism is toned down to matte paper. */
 .glass-panel {
-  background: rgba(250, 246, 239, 0.78); /* sand-900 washi @ 78% */
-  backdrop-filter: blur(10px) saturate(105%);
-  -webkit-backdrop-filter: blur(10px) saturate(105%);
-  border: 1px solid rgba(43, 39, 35, 0.09);
-  box-shadow: 0 14px 34px -26px rgba(43, 39, 35, 0.28);
+  background: rgba(250, 246, 239, 0.88); /* sand-900 washi @ 88% */
+  backdrop-filter: blur(12px) saturate(105%);
+  -webkit-backdrop-filter: blur(12px) saturate(105%);
+  border: 1px solid rgba(43, 39, 35, 0.12);
+  box-shadow: 0 14px 34px -26px rgba(43, 39, 35, 0.22);
 }
 
 /* Subject / surface halos tuned to the japandi accents — soft cedar, moss and clay light

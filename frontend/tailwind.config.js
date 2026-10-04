@@ -79,6 +79,20 @@ const japandiPalette = {
     900: '#DDB6B2',
     950: '#EFD9D6', // palest clay wash
   },
+  amber: {
+    50: '#2B1A08',  // deep roasted cedar
+    100: '#42280C', // rich dark cedar ink (contrast >= 8:1 on paper)
+    200: '#5A3710', // dark warm chestnut
+    300: '#734614', // deep warm cedar brown
+    400: '#8B5A2B', // rich cedar/warm brown text tint on paper
+    500: '#A87034', // warm amber/ochre accent
+    600: '#965E23', // solid button fill (white text)
+    700: '#754716',
+    800: '#42280C', // rich dark cedar brown (contrast on light washi)
+    850: '#CFA36E',
+    900: '#EBD0A7',
+    950: '#F7EBD5', // warm washi honey wash
+  },
 };
 export default {
   content: [
@@ -91,9 +105,21 @@ export default {
     'text-ember-400',
     'text-olive-400',
     'text-clay-400',
+    'text-amber-400',
+    'text-ember-300',
+    'text-olive-300',
+    'text-clay-300',
+    'bg-ember-500/15',
+    'bg-olive-500/15',
+    'bg-clay-500/15',
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['Arial', 'Helvetica Neue', 'Helvetica', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        serif: ['Times New Roman', 'Times', 'Georgia', 'serif'],
+        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+      },
       colors: japandiPalette,
       // Warm default focus ring (Tailwind ships a blue-500 default in preflight).
       ringColor: {

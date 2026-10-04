@@ -257,14 +257,15 @@ class SmartBookDivider:
                  path: Optional[str] = None, text: Optional[str] = None,
                  title: Optional[str] = None, subject: Optional[str] = None,
                  tier: Optional[str] = None, course_id: Optional[str] = None,
-                 units: Optional[List[Dict[str, Any]]] = None):
+                 units: Optional[List[Dict[str, Any]]] = None,
+                 extracted_book: Optional[Any] = None):
         """Accepts either a bundled preset key or any user-supplied book.
 
         `path` may be .txt/.md or any format MaterialParser can read
         (.pdf/.epub/.mobi/.xps/.fb2); `text` allows raw in-memory content
         (pasted notes, API payloads). Structure is always inferred, never assumed.
         """
-        if path or text:
+        if path or text or extracted_book is not None:
             self.book = self._ad_hoc_book(path=path, text=text, title=title,
                                           subject=subject, tier=tier,
                                           course_id=course_id, units=units)
@@ -274,8 +275,28 @@ class SmartBookDivider:
                 raise ValueError(f"Unknown book '{book_key}'. Choose from: {list(BOOKS.keys())}")
             self.book = dict(BOOKS[book_key])
 
-        self.raw_text = self._load_source(self.book)
-        self.structurer = BookStructurer(self.raw_text)
+        path = self.book.get("path")
+        self.extracted_book = extracted_book
+        if self.extracted_book is not None:
+            self.raw_text = text if text is not None else getattr(self.extracted_book, "text", "")
+            self.structurer = BookStructurer(self.raw_text, extracted_book=self.extracted_book, outline=getattr(self.extracted_book, "outline", None))
+        elif path and os.path.exists(path) and os.path.splitext(path)[1].lower() == ".pdf":
+            try:
+                from backend.book_extract import extract_pdf
+            except ImportError:
+                from book_extract import extract_pdf
+            try:
+                self.extracted_book = extract_pdf(path)
+                self.raw_text = self.extracted_book.text
+                self.structurer = BookStructurer(self.raw_text, extracted_book=self.extracted_book, outline=self.extracted_book.outline)
+            except Exception as e:
+                print(f"[divide_book] PDF extraction failed: {e}. Falling back to standard loader.")
+                self.raw_text = self._load_source(self.book)
+                self.structurer = BookStructurer(self.raw_text)
+        else:
+            self.raw_text = self._load_source(self.book)
+            self.structurer = BookStructurer(self.raw_text)
+
         self.plan = self.structurer.plan()
         print("[divide_book] Inferred structure:")
         for line in self.plan.describe().split("\n"):
@@ -358,6 +379,12 @@ class SmartBookDivider:
             Glossary 34
         """
         self.body_start = self._find_body_start()
+        if getattr(self, "plan", None) and self.plan.parsed_chapters and len(self.plan.parsed_chapters) >= 3:
+            self.toc = self.plan.parsed_chapters
+            print(f"[divide_book] {self.plan.source.title()} structure: {len(self.toc)} chapters, "
+                  f"{sum(len(c.get('sections', [])) for c in self.toc)} sections.")
+            return self.toc
+
         front = self.raw_text[:self.body_start]
         lowered = front.lower()
         c_idx = lowered.find("contents")
@@ -787,18 +814,30 @@ class SmartBookDivider:
             base_id = f"ch_{num}"
             id_uses[base_id] = id_uses.get(base_id, 0) + 1
             chapter_id = base_id if id_uses[base_id] == 1 else f"{base_id}_{id_uses[base_id]}"
+            seen_sub_keys = set()
+            deduped_subsections = []
+            for s in sections:
+                key = (s.get("label") or s.get("section_id") or s.get("title") or "").strip().lower()
+                if key and key in seen_sub_keys:
+                    continue
+                if key:
+                    seen_sub_keys.add(key)
+                deduped_subsections.append({
+                    "section_id": s["section_id"],
+                    "label": s["label"],
+                    "title": s["title"]
+                })
+
+            clean_ch_title = self._clean_chapter_title(num, meta['title'])
             chapters.append({
                 "chapter_id": chapter_id,
                 "chapter_index": num,
-                "title": f"{num}. {self._clean_chapter_title(num, meta['title'])}",
+                "title": f"Chapter {num}: {clean_ch_title}",
                 "unit_index": unit["unit_index"],
                 "unit_name": unit["unit_name"],
                 "toc_sections": [s["label"] for s in meta["sections"]],
                 "sections_count": len(sections),
-                "subsections": [
-                    {"section_id": s["section_id"], "label": s["label"], "title": s["title"]}
-                    for s in sections
-                ],
+                "subsections": deduped_subsections,
                 "content_preview": body[:420],
                 "full_text": body,
                 "section_texts": sections,

@@ -30,7 +30,7 @@ const COLOR_MAP = {
     border: 'border-clay-500/40',
     badge: 'bg-clay-500/20 text-clay-300 border-clay-500/30',
     ring: 'ring-clay-500/40',
-    gradient: 'from-clay-600 via-amber-600 to-ember-600'
+    gradient: 'from-clay-600 via-ember-600 to-olive-600'
   },
   ember: {
     text: 'text-ember-400',
@@ -38,7 +38,7 @@ const COLOR_MAP = {
     border: 'border-ember-500/40',
     badge: 'bg-ember-500/20 text-ember-300 border-ember-500/30',
     ring: 'ring-ember-500/40',
-    gradient: 'from-ember-600 via-clay-600 to-amber-600'
+    gradient: 'from-ember-600 via-clay-600 to-olive-600'
   },
   olive: {
     text: 'text-olive-400',
@@ -46,7 +46,7 @@ const COLOR_MAP = {
     border: 'border-olive-500/40',
     badge: 'bg-olive-500/20 text-olive-300 border-olive-500/30',
     ring: 'ring-olive-500/40',
-    gradient: 'from-olive-600 via-clay-600 to-amber-600'
+    gradient: 'from-olive-600 via-clay-600 to-ember-600'
   },
 };
 
@@ -210,6 +210,20 @@ export default function TheoryExplorer({
   // First mental model's analogy as a warm pull-quote hook
   const hookAnalogy = mentalModels[0]?.analogy || null;
 
+  // Deduplicated subsection pills
+  const uniqueSubsections = useMemo(() => {
+    if (!currentChapter?.subsections?.length) return [];
+    const seen = new Set();
+    return currentChapter.subsections.filter((sub, i) => {
+      const normLabel = (sub.label || sub.sec_idx || '').toString().trim().toLowerCase();
+      const normTitle = (sub.title || '').toString().trim().toLowerCase();
+      const key = normLabel || normTitle || String(i);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [currentChapter?.subsections]);
+
   const handleCopy = (text, id) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
@@ -282,9 +296,9 @@ export default function TheoryExplorer({
             )}
             {currentChapter?.theory_source && (
               <span
-                className={`px-2 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-wider border ${
+                className={`px-2.5 py-1 rounded-full text-[11px] font-mono uppercase tracking-wider font-semibold border ${
                   currentChapter.theory_source === 'llm'
-                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                    ? 'bg-ember-500/15 text-ember-300 border-ember-500/30'
                     : 'bg-olive-500/15 text-olive-300 border-olive-500/30'
                 }`}
                 title={
@@ -298,27 +312,40 @@ export default function TheoryExplorer({
             )}
           </div>
 
-          <h2 className="text-xl sm:text-2xl font-extrabold text-sand-50 tracking-tight">
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-sand-50 tracking-tight">
             {currentChapter?.title || courseTitle}
           </h2>
 
-          {/* Warm analogy pull-quote hook */}
-          {hookAnalogy && viewMode === 'reader' && (
-            <div className="mt-3 flex items-start gap-2.5 bg-amber-500/10 border border-amber-500/25 rounded-2xl px-4 py-2.5">
-              <Lightbulb className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-100 leading-relaxed italic font-serif">{hookAnalogy}</p>
+          {/* Warm analogy pull-quote hook with guaranteed high contrast */}
+          {hookAnalogy && (
+            <div
+              className="mt-4 flex items-start gap-3.5 rounded-2xl px-5 py-4 shadow-japandi-sm border-l-4 border text-[#1E1B18] !text-[#1E1B18] bg-[#FAF0E6] !bg-[#FAF0E6]"
+              style={{
+                backgroundColor: '#FAF0E6',
+                borderColor: '#D9D1C3',
+                borderLeftColor: '#9A5530',
+                color: '#1E1B18',
+              }}
+            >
+              <Lightbulb className="w-5 h-5 shrink-0 mt-0.5" style={{ color: '#9A5530' }} />
+              <p
+                className="text-sm sm:text-base leading-relaxed italic font-serif font-semibold text-[#1E1B18] !text-[#1E1B18]"
+                style={{ color: '#1E1B18' }}
+              >
+                {hookAnalogy}
+              </p>
             </div>
           )}
 
-          {/* Subsection outline pills */}
-          {currentChapter?.subsections?.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-3">
-              {currentChapter.subsections.map((sub, i) => {
+          {/* Subsection outline pills (deduplicated) */}
+          {uniqueSubsections.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-3.5">
+              {uniqueSubsections.map((sub, i) => {
                 const pillLabel = sub.label || sub.sec_idx || i + 1;
                 return (
                   <span
-                    key={sub.section_id || i}
-                    className="px-2 py-0.5 rounded-lg text-[10px] font-mono bg-sand-900 text-sand-400 border border-sand-800 hover:text-sand-200 transition"
+                    key={sub.section_id || `${pillLabel}_${i}`}
+                    className="px-2.5 py-1 rounded-lg text-xs font-mono bg-sand-900 text-sand-300 border border-sand-800 hover:text-sand-100 hover:border-sand-700 transition"
                     title={sub.title || ''}
                   >
                     §{pillLabel}
@@ -357,38 +384,38 @@ export default function TheoryExplorer({
           )}
 
           {/* View mode toggle */}
-          <div className="flex bg-sand-900/90 p-1 rounded-2xl border border-sand-800 shadow-inner">
+          <div className="flex bg-sand-900/90 p-1.5 rounded-2xl border border-sand-800 shadow-inner">
             <button
               onClick={() => setViewMode('reader')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
                 viewMode === 'reader'
                   ? `${colors.bg} text-white shadow-md font-bold`
                   : 'text-sand-400 hover:text-sand-200'
               }`}
             >
-              <BookOpen className="w-3.5 h-3.5" />
+              <BookOpen className="w-4 h-4" />
               <span>Reader</span>
             </button>
             <button
               onClick={() => setViewMode('matrix')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
                 viewMode === 'matrix'
                   ? `${colors.bg} text-white shadow-md font-bold`
                   : 'text-sand-400 hover:text-sand-200'
               }`}
             >
-              <Layers className="w-3.5 h-3.5" />
+              <Layers className="w-4 h-4" />
               <span>Matrix</span>
             </button>
             <button
               onClick={() => setViewMode('cards')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
                 viewMode === 'cards'
                   ? `${colors.bg} text-white shadow-md font-bold`
                   : 'text-sand-400 hover:text-sand-200'
               }`}
             >
-              <Atom className="w-3.5 h-3.5" />
+              <Atom className="w-4 h-4" />
               <span>Deck ({displayedCards.length})</span>
             </button>
           </div>
@@ -396,10 +423,10 @@ export default function TheoryExplorer({
           {onNavigateToPractice && (
             <button
               onClick={onNavigateToPractice}
-              className="bg-gradient-to-r from-olive-600 to-amber-600 hover:from-olive-500 hover:to-amber-500 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-lg shadow-sand-300/25 transition flex items-center gap-1.5 active:scale-95"
+              className="bg-gradient-to-r from-olive-600 via-ember-600 to-clay-600 hover:from-olive-500 hover:to-clay-500 text-white text-xs sm:text-sm font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-sand-300/25 transition flex items-center gap-1.5 active:scale-95"
             >
               <span>Practice Lab</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <ArrowRight className="w-4 h-4" />
             </button>
           )}
         </div>
@@ -413,25 +440,25 @@ export default function TheoryExplorer({
           {/* Executive Overview & Learning Objectives */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2 glass-panel p-6 sm:p-8 rounded-3xl border border-sand-800 space-y-4">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-clay-400">
-                <Sparkles className="w-4 h-4" />
+              <div className="flex items-center gap-2 text-xs sm:text-sm font-bold uppercase tracking-wider text-clay-400">
+                <Sparkles className="w-4 h-4 text-clay-400" />
                 <span>Executive Theory Synthesis</span>
               </div>
-              <p className="text-sm sm:text-base text-sand-200 leading-relaxed font-serif">
+              <p className="text-base sm:text-lg text-sand-50 leading-relaxed font-serif">
                 {currentChapter?.summary || "Foundational theoretical overview and structured takeaways for this learning module."}
               </p>
             </div>
 
             {/* Learning Objectives Card */}
-            <div className="glass-panel p-6 rounded-3xl border border-sand-800 space-y-3 bg-gradient-to-b from-sand-900/60 to-clay-950/20">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-olive-400">
-                <CheckCircle2 className="w-4 h-4" />
+            <div className="glass-panel p-6 sm:p-7 rounded-3xl border border-sand-800 space-y-4 bg-gradient-to-b from-sand-900/80 to-olive-950/20">
+              <div className="flex items-center gap-2 text-xs sm:text-sm font-bold uppercase tracking-wider text-olive-400">
+                <CheckCircle2 className="w-4 h-4 text-olive-400" />
                 <span>Core Learning Objectives</span>
               </div>
-              <ul className="space-y-2.5">
+              <ul className="space-y-3">
                 {objectives.map((obj, i) => (
-                  <li key={i} className="flex items-start gap-2.5 text-xs sm:text-sm text-sand-300 leading-relaxed">
-                    <span className="w-4 h-4 rounded-full bg-olive-500/20 text-olive-400 font-mono text-[10px] flex items-center justify-center shrink-0 mt-0.5 font-bold">
+                  <li key={i} className="flex items-start gap-3 text-sm sm:text-[15px] text-sand-100 leading-relaxed">
+                    <span className="w-5 h-5 rounded-full bg-olive-500/20 text-olive-400 font-mono text-xs flex items-center justify-center shrink-0 mt-0.5 font-bold">
                       {i + 1}
                     </span>
                     <span>{obj}</span>
@@ -449,29 +476,29 @@ export default function TheoryExplorer({
                   <Atom className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-sand-50">Governing Principles & Definitions</h3>
-                  <p className="text-xs text-sand-400">Invariant axioms and fundamental mechanics established by this module</p>
+                  <h3 className="text-lg sm:text-xl font-bold text-sand-50">Governing Principles & Definitions</h3>
+                  <p className="text-xs sm:text-sm text-sand-400">Invariant axioms and fundamental mechanics established by this module</p>
                 </div>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {principles.map((pr, idx) => (
-                <div key={idx} className="p-5 rounded-2xl bg-sand-900/70 border border-sand-800 hover:border-ember-500/40 transition-all space-y-2">
+                <div key={idx} className="p-5 sm:p-6 rounded-2xl bg-sand-900/70 border border-sand-800 hover:border-ember-500/40 transition-all space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <span className="px-2 py-0.5 rounded-md text-[10px] font-mono uppercase bg-ember-500/20 text-ember-300 font-semibold">
+                    <span className="px-2.5 py-1 rounded-md text-xs font-mono uppercase bg-ember-500/20 text-ember-300 font-semibold">
                       {pr.tag || "Core Axiom"}
                     </span>
                     <button 
                       onClick={() => handleCopy(pr.content, `pr_${idx}`)}
-                      className="text-sand-500 hover:text-sand-300 p-1 rounded transition"
+                      className="text-sand-500 hover:text-sand-300 p-1.5 rounded transition"
                       title="Copy excerpt"
                     >
-                      {copiedId === `pr_${idx}` ? <Check className="w-3.5 h-3.5 text-olive-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copiedId === `pr_${idx}` ? <Check className="w-4 h-4 text-olive-400" /> : <Copy className="w-4 h-4" />}
                     </button>
                   </div>
-                  <h4 className="text-sm font-bold text-sand-100">{pr.title}</h4>
-                  <p className="text-xs sm:text-sm text-sand-300 leading-relaxed">{pr.content}</p>
+                  <h4 className="text-base sm:text-lg font-bold text-sand-50">{pr.title}</h4>
+                  <p className="text-sm sm:text-base text-sand-100 leading-relaxed">{pr.content}</p>
                 </div>
               ))}
             </div>
@@ -484,24 +511,24 @@ export default function TheoryExplorer({
                 <Binary className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-sand-50">Mathematical Formulations & Derivations</h3>
-                <p className="text-xs text-sand-400">Governing equations, variable relations, and analytical rules</p>
+                <h3 className="text-lg sm:text-xl font-bold text-sand-50">Mathematical Formulations & Derivations</h3>
+                <p className="text-xs sm:text-sm text-sand-400">Governing equations, variable relations, and analytical rules</p>
               </div>
             </div>
 
             <div className="space-y-4">
               {formulations.map((fm, idx) => (
                 <div key={idx} className="p-6 rounded-2xl bg-sand-950 border border-clay-500/20 space-y-4 shadow-lg">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-sand-900">
-                    <h4 className="text-sm font-bold text-clay-200">{fm.title}</h4>
-                    <span className="text-[10px] font-mono text-sand-400 bg-sand-900 px-2.5 py-1 rounded-lg border border-sand-800">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-sand-800">
+                    <h4 className="text-base sm:text-lg font-bold text-clay-300">{fm.title}</h4>
+                    <span className="text-xs font-mono text-sand-400 bg-sand-900 px-3 py-1 rounded-lg border border-sand-800">
                       Analytical Specification
                     </span>
                   </div>
 
                   {/* Formula Display Box with Copy Button */}
                   <div className="relative group">
-                    <div className="p-4 rounded-xl bg-clay-950/30 border border-clay-500/30 text-clay-100 font-mono text-sm sm:text-base text-center overflow-x-auto shadow-inner">
+                    <div className="p-4 sm:p-5 rounded-xl bg-sand-900/90 border border-clay-500/30 text-sand-50 font-mono text-base sm:text-xl font-semibold text-center overflow-x-auto shadow-inner">
                       {fm.formula}
                     </div>
                     <button
@@ -509,18 +536,18 @@ export default function TheoryExplorer({
                       className="absolute right-2 top-2 p-1.5 rounded-lg bg-sand-900/80 border border-sand-700 text-sand-400 hover:text-sand-100 opacity-0 group-hover:opacity-100 transition"
                       title="Copy formula"
                     >
-                      {copiedId === `fm_${idx}` ? <Check className="w-3.5 h-3.5 text-olive-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copiedId === `fm_${idx}` ? <Check className="w-4 h-4 text-olive-400" /> : <Copy className="w-4 h-4" />}
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                    <div className="p-3.5 rounded-xl bg-sand-900/50 border border-sand-800/80">
-                      <span className="text-[10px] font-bold uppercase text-sand-400 block mb-1">Derivation Logic</span>
-                      <p className="text-sand-300 text-xs sm:text-sm leading-relaxed">{fm.derivation}</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs sm:text-sm">
+                    <div className="p-4 rounded-xl bg-sand-900/50 border border-sand-800/80">
+                      <span className="text-xs font-bold uppercase text-sand-400 block mb-1.5">Derivation Logic</span>
+                      <p className="text-sand-100 text-sm sm:text-base leading-relaxed">{fm.derivation}</p>
                     </div>
-                    <div className="p-3.5 rounded-xl bg-sand-900/50 border border-sand-800/80">
-                      <span className="text-[10px] font-bold uppercase text-sand-400 block mb-1">State Variables & Constants</span>
-                      <p className="text-sand-300 text-xs sm:text-sm leading-relaxed">{fm.variables}</p>
+                    <div className="p-4 rounded-xl bg-sand-900/50 border border-sand-800/80">
+                      <span className="text-xs font-bold uppercase text-sand-400 block mb-1.5">State Variables & Constants</span>
+                      <p className="text-sand-100 text-sm sm:text-base leading-relaxed">{fm.variables}</p>
                     </div>
                   </div>
                 </div>
@@ -531,39 +558,42 @@ export default function TheoryExplorer({
           {/* Section 3: Dual Grid - Mental Models & Cognitive Misconceptions */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Mental Model & Analogies */}
-            <div className="glass-panel p-6 rounded-3xl border border-sand-800 space-y-4 bg-gradient-to-br from-sand-900/80 via-sand-950 to-amber-950/10">
-              <div className="flex items-center gap-2.5 text-xs font-bold uppercase tracking-wider text-amber-500">
-                <Lightbulb className="w-4 h-4" />
+            <div className="glass-panel p-6 sm:p-7 rounded-3xl border border-sand-800 space-y-5 bg-gradient-to-br from-sand-900/90 via-sand-950 to-ember-950/15">
+              <div className="flex items-center gap-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider text-ember-400">
+                <Lightbulb className="w-4 h-4 text-ember-400" />
                 <span>Mental Models & Analogies</span>
               </div>
               {mentalModels.map((mm, idx) => (
-                <div key={idx} className="space-y-2.5">
-                  <h4 className="text-sm font-bold text-sand-50">{mm.concept}</h4>
-                  <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs sm:text-sm text-amber-100 leading-relaxed font-serif">
+                <div key={idx} className="space-y-3">
+                  <h4 className="text-base sm:text-lg font-bold text-sand-50">{mm.concept}</h4>
+                  <div
+                    className="p-4 sm:p-5 rounded-2xl bg-sand-900/95 border border-ember-500/30 text-sm sm:text-base leading-relaxed font-serif shadow-sm text-[#1E1B18] !text-[#1E1B18]"
+                    style={{ color: '#1E1B18' }}
+                  >
                     {mm.analogy}
                   </div>
-                  <div className="text-xs text-sand-300 flex items-start gap-2">
-                    <strong className="text-amber-400 shrink-0">Key Intuition:</strong>
-                    <span>{mm.takeaway}</span>
+                  <div className="text-xs sm:text-sm text-sand-200 flex items-start gap-2">
+                    <strong className="text-ember-400 font-bold shrink-0">Key Intuition:</strong>
+                    <span className="text-sand-100">{mm.takeaway}</span>
                   </div>
                 </div>
               ))}
             </div>
 
             {/* Cognitive Traps & Misconceptions */}
-            <div className="glass-panel p-6 rounded-3xl border border-sand-800 space-y-4 bg-gradient-to-br from-sand-900/80 via-sand-950 to-clay-950/10">
-              <div className="flex items-center gap-2.5 text-xs font-bold uppercase tracking-wider text-clay-400">
-                <AlertTriangle className="w-4 h-4" />
+            <div className="glass-panel p-6 sm:p-7 rounded-3xl border border-sand-800 space-y-5 bg-gradient-to-br from-sand-900/90 via-sand-950 to-clay-950/15">
+              <div className="flex items-center gap-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider text-clay-400">
+                <AlertTriangle className="w-4 h-4 text-clay-400" />
                 <span>Diagnostic Pitfalls & Misconceptions</span>
               </div>
               {misconceptions.map((mc, idx) => (
-                <div key={idx} className="space-y-2.5">
-                  <div className="text-xs text-clay-300 font-semibold flex items-start gap-2">
+                <div key={idx} className="space-y-3">
+                  <div className="text-xs sm:text-sm text-clay-300 font-semibold flex items-start gap-2">
                     <span className="text-clay-400 font-bold shrink-0">⚠ Trap:</span>
-                    <span>{mc.trap}</span>
+                    <span className="text-sand-100">{mc.trap}</span>
                   </div>
-                  <div className="p-3.5 rounded-xl bg-clay-500/10 border border-clay-500/20 text-xs sm:text-sm text-sand-200 leading-relaxed">
-                    <strong className="text-olive-400 block mb-1">Correct Conceptual Approach:</strong>
+                  <div className="p-4 sm:p-5 rounded-2xl bg-sand-900/95 border border-clay-500/30 text-sm sm:text-base text-sand-100 leading-relaxed shadow-sm">
+                    <strong className="text-olive-400 block mb-1.5 font-bold">Correct Conceptual Approach:</strong>
                     {mc.correction}
                   </div>
                 </div>
@@ -580,8 +610,8 @@ export default function TheoryExplorer({
                     <Layers className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-sand-50">Section-by-Section Study Map</h3>
-                    <p className="text-xs text-sand-400">
+                    <h3 className="text-lg font-bold text-sand-50">Section-by-Section Study Map</h3>
+                    <p className="text-xs sm:text-sm text-sand-400">
                       {currentChapter.section_texts.length} sections mapped from the textbook — tap to read
                     </p>
                   </div>
@@ -589,14 +619,14 @@ export default function TheoryExplorer({
 
                 <button
                   onClick={() => setExpandAllSections(!expandAllSections)}
-                  className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-sand-900 border border-sand-800 text-sand-300 hover:text-sand-100 hover:border-sand-700 transition flex items-center gap-1.5"
+                  className="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-sand-900 border border-sand-800 text-sand-200 hover:text-sand-50 hover:border-sand-700 transition flex items-center gap-1.5"
                 >
-                  {expandAllSections ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                  {expandAllSections ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                   <span>{expandAllSections ? 'Collapse All' : 'Expand All'}</span>
                 </button>
               </div>
 
-              <div className="space-y-2.5">
+              <div className="space-y-3">
                 {currentChapter.section_texts.map((sec, idx) => {
                   const key = sec.section_id || `${idx}`;
                   const isOpen = expandAllSections || openSection === key;
@@ -610,21 +640,21 @@ export default function TheoryExplorer({
                           if (expandAllSections) setExpandAllSections(false);
                           setOpenSection(openSection === key ? null : key);
                         }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-sand-800/40 transition"
+                        className="w-full flex items-center gap-3.5 px-4 sm:px-5 py-3.5 text-left hover:bg-sand-800/40 transition"
                       >
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-mono bg-clay-500/20 text-clay-300 border border-clay-500/30 shrink-0 font-bold">
+                        <span className="px-2.5 py-1 rounded-md text-xs font-mono bg-clay-500/20 text-clay-300 border border-clay-500/30 shrink-0 font-bold">
                           {sec.label}
                         </span>
-                        <span className="flex-1 text-xs sm:text-sm font-semibold text-sand-200 truncate">
+                        <span className="flex-1 text-sm sm:text-base font-semibold text-sand-100 truncate">
                           {sec.title}
                         </span>
-                        <span className="text-[10px] font-mono text-sand-400 shrink-0 bg-sand-950 px-2 py-0.5 rounded border border-sand-800">
+                        <span className="text-xs font-mono text-sand-400 shrink-0 bg-sand-950 px-2.5 py-1 rounded border border-sand-800">
                           ~{wordCount}w · {estMinutes}m read
                         </span>
                         {isOpen ? <ChevronDown className="w-4 h-4 text-sand-400 shrink-0" /> : <ChevronRight className="w-4 h-4 text-sand-400 shrink-0" />}
                       </button>
                       {isOpen && (
-                        <div className="px-5 pb-5 pt-2 max-h-[460px] overflow-y-auto custom-scrollbar animate-fadeIn border-t border-sand-800 bg-sand-950/40">
+                        <div className="px-5 sm:px-6 pb-6 pt-3 max-h-[500px] overflow-y-auto custom-scrollbar animate-fadeIn border-t border-sand-800 bg-sand-950/40">
                           {renderSourceAsProse(sec.content)}
                         </div>
                       )}
@@ -643,16 +673,16 @@ export default function TheoryExplorer({
                   <BookOpen className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-sand-50">Key Terms & Glossary</h3>
-                  <p className="text-xs text-sand-400">Definitions extracted directly from the chapter text</p>
+                  <h3 className="text-lg sm:text-xl font-bold text-sand-50">Key Terms & Glossary</h3>
+                  <p className="text-xs sm:text-sm text-sand-400">Definitions extracted directly from the chapter text</p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {keyTerms.map((kt, idx) => (
-                  <div key={idx} className="p-4 rounded-2xl bg-sand-900/70 border border-sand-800 space-y-1.5 hover:border-sand-700 transition">
-                    <h4 className="text-sm font-bold text-sand-100">{kt.term}</h4>
-                    <p className="text-xs text-sand-300 leading-relaxed">{kt.definition}</p>
+                  <div key={idx} className="p-5 rounded-2xl bg-sand-900/70 border border-sand-800 space-y-2 hover:border-sand-700 transition">
+                    <h4 className="text-base sm:text-lg font-bold text-sand-50">{kt.term}</h4>
+                    <p className="text-sm sm:text-base text-sand-100 leading-relaxed">{kt.definition}</p>
                   </div>
                 ))}
               </div>
@@ -667,18 +697,18 @@ export default function TheoryExplorer({
                   <HelpCircle className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-sand-50">Worked Examples from the Source</h3>
-                  <p className="text-xs text-sand-400">Solved-problem walkthroughs taken directly from the chapter</p>
+                  <h3 className="text-lg sm:text-xl font-bold text-sand-50">Worked Examples from the Source</h3>
+                  <p className="text-xs sm:text-sm text-sand-400">Solved-problem walkthroughs taken directly from the chapter</p>
                 </div>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-3.5">
                 {workedExamples.map((we, idx) => (
-                  <div key={idx} className="p-5 rounded-2xl bg-sand-950 border border-sand-800 space-y-2">
-                    <h4 className="text-xs font-bold text-ember-300 uppercase tracking-wider">
+                  <div key={idx} className="p-5 sm:p-6 rounded-2xl bg-sand-950 border border-sand-800 space-y-2.5">
+                    <h4 className="text-sm sm:text-base font-bold text-ember-400 uppercase tracking-wider">
                       {we.title || `Example ${idx + 1}`}
                     </h4>
-                    <p className="text-xs sm:text-sm text-sand-300 leading-relaxed whitespace-pre-line">
+                    <p className="text-sm sm:text-base text-sand-100 leading-relaxed whitespace-pre-line">
                       {we.content}
                     </p>
                   </div>
@@ -722,40 +752,40 @@ export default function TheoryExplorer({
               <div
                 key={card.id || idx}
                 onClick={() => setExpandedSection(isExpanded ? null : idx)}
-                className={`glass-panel p-6 rounded-3xl border transition-all duration-300 cursor-pointer flex flex-col justify-between ${
+                className={`glass-panel p-6 sm:p-7 rounded-3xl border transition-all duration-300 cursor-pointer flex flex-col justify-between ${
                   isExpanded
-                    ? 'border-clay-500 bg-sand-900/90 shadow-2xl shadow-sand-300/25 ring-1 ring-clay-500/50'
-                    : 'border-sand-800 hover:border-sand-700 bg-sand-900/50 hover:bg-sand-900/80 hover:-translate-y-0.5'
+                    ? 'border-clay-500 bg-sand-900/95 shadow-2xl shadow-sand-300/25 ring-1 ring-clay-500/50'
+                    : 'border-sand-800 hover:border-sand-700 bg-sand-900/60 hover:bg-sand-900/90 hover:-translate-y-0.5'
                 }`}
               >
-                <div className="space-y-3">
+                <div className="space-y-3.5">
                   <div className="flex items-center justify-between">
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-clay-500/20 text-clay-300 border border-clay-500/30">
+                    <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-clay-500/20 text-clay-300 border border-clay-500/30">
                       Concept {idx + 1}
                     </span>
-                    <span className="text-[10px] font-mono text-sand-500">
+                    <span className="text-xs font-mono text-sand-400">
                       {isExpanded ? 'Click to collapse' : 'Click to expand'}
                     </span>
                   </div>
 
-                  <h3 className="text-sm font-bold text-sand-50 transition">
+                  <h3 className="text-base sm:text-lg font-bold text-sand-50 transition">
                     {card.topic || `Concept ${idx + 1}`}
                   </h3>
 
-                  <p className="text-xs font-semibold text-clay-200 leading-snug">
+                  <p className="text-sm sm:text-base font-semibold text-clay-300 leading-snug">
                     {card.question}
                   </p>
 
-                  <div className={`text-xs sm:text-sm text-sand-300 leading-relaxed pt-2 border-t border-sand-800/80 whitespace-pre-line ${
+                  <div className={`text-sm sm:text-base text-sand-100 leading-relaxed pt-2.5 border-t border-sand-800/80 whitespace-pre-line ${
                     isExpanded ? 'block' : 'line-clamp-4'
                   }`}>
                     {card.answer}
                   </div>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-sand-800/50 flex items-center justify-between text-[11px] text-clay-400 font-bold">
+                <div className="mt-4 pt-3 border-t border-sand-800/50 flex items-center justify-between text-xs sm:text-sm text-clay-400 font-bold">
                   <span>{isExpanded ? 'Detailed Breakdown Active' : 'Read Deep Breakdown'}</span>
-                  <ChevronRight className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                  <ChevronRight className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                 </div>
               </div>
             );
@@ -770,14 +800,14 @@ export default function TheoryExplorer({
         <div className="glass-panel p-6 sm:p-10 rounded-3xl border border-sand-800 shadow-2xl space-y-6 animate-fadeIn">
           <div className="flex items-center justify-between border-b border-sand-800 pb-4">
             <div className="flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-clay-400" />
-              <span className="text-xs font-bold text-sand-50">
+              <BookOpen className="w-5 h-5 text-clay-400" />
+              <span className="text-sm sm:text-base font-bold text-sand-50">
                 Focus Study Card {displayedCards.length > 0 ? Math.min(cardIndex + 1, displayedCards.length) : 0} of {displayedCards.length}
               </span>
             </div>
-            <div className="flex items-center gap-3 text-[11px] font-mono text-sand-400">
-              <span className="hidden sm:inline text-sand-500">Shortcut: Space/Click to flip • ←/→ to navigate</span>
-              <span className="px-2 py-0.5 rounded bg-sand-900 border border-sand-800 text-clay-300">
+            <div className="flex items-center gap-3 text-xs font-mono text-sand-400">
+              <span className="hidden sm:inline text-sand-500 font-medium">Shortcut: Space/Click to flip • ←/→ to navigate</span>
+              <span className="px-3 py-1 rounded-lg bg-sand-900 border border-sand-800 text-clay-300 font-bold">
                 {isFlipped ? 'Answer View' : 'Question View'}
               </span>
             </div>
@@ -787,50 +817,50 @@ export default function TheoryExplorer({
             <div className="flex flex-col items-center justify-center py-4">
               <div 
                 onClick={() => setIsFlipped(!isFlipped)} 
-                className="flip-card w-full max-w-3xl h-[400px] sm:h-[440px] cursor-pointer group"
+                className="flip-card w-full max-w-3xl h-[420px] sm:h-[460px] cursor-pointer group"
               >
                 <div className={`flip-card-inner ${isFlipped ? 'flipped' : ''}`}>
                   
                   {/* FRONT SIDE (PROMPT) */}
                   <div className="flip-card-front bg-gradient-to-br from-sand-900 via-sand-950 to-clay-950/40 border border-clay-900/40 hover:border-clay-500/60 p-8 sm:p-10 flex flex-col justify-between items-center text-center shadow-2xl rounded-3xl relative overflow-hidden transition-all duration-300">
                     <div className="flex items-center justify-between w-full">
-                      <span className="px-3 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider bg-clay-500/20 text-clay-300 font-bold border border-clay-500/30">
+                      <span className="px-3.5 py-1 rounded-full text-xs font-mono uppercase tracking-wider bg-clay-500/20 text-clay-300 font-bold border border-clay-500/30">
                         {displayedCards[cardIndex]?.topic || 'Core Theory'}
                       </span>
-                      <span className="text-[10px] font-mono text-sand-500">Front (Prompt)</span>
+                      <span className="text-xs font-mono text-sand-400 font-medium">Front (Prompt)</span>
                     </div>
 
-                    <div className="my-auto py-6 max-w-xl space-y-3">
-                      <div className="w-12 h-12 rounded-2xl bg-clay-500/10 text-clay-400 flex items-center justify-center mx-auto border border-clay-500/20 shadow-inner">
-                        <HelpCircle className="w-6 h-6" />
+                    <div className="my-auto py-6 max-w-xl space-y-4">
+                      <div className="w-14 h-14 rounded-2xl bg-clay-500/10 text-clay-400 flex items-center justify-center mx-auto border border-clay-500/20 shadow-inner">
+                        <HelpCircle className="w-7 h-7" />
                       </div>
-                      <h3 className="text-lg sm:text-xl font-bold text-sand-50 leading-relaxed">
+                      <h3 className="text-xl sm:text-2xl font-bold text-sand-50 leading-relaxed">
                         {displayedCards[cardIndex]?.question}
                       </h3>
                     </div>
 
-                    <div className="flex items-center gap-2 text-xs text-clay-400 font-semibold group-hover:translate-y-[-2px] transition">
+                    <div className="flex items-center gap-2 text-xs sm:text-sm text-clay-400 font-semibold group-hover:translate-y-[-2px] transition">
                       <span>Click or press Spacebar to flip</span>
                       <ChevronRight className="w-4 h-4" />
                     </div>
                   </div>
 
                   {/* BACK SIDE (SOLUTION & BULLETS) */}
-                  <div className="flip-card-back bg-gradient-to-br from-sand-900 via-clay-950/50 to-sand-950 border border-clay-500/60 p-8 sm:p-10 flex flex-col justify-between text-left shadow-2xl rounded-3xl overflow-y-auto custom-scrollbar">
-                    <div className="flex items-center justify-between w-full pb-3 border-b border-clay-500/30">
-                      <span className="px-3 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider bg-olive-500/20 text-olive-300 font-bold border border-olive-500/30">
+                  <div className="flip-card-back bg-gradient-to-br from-sand-900 via-sand-950 to-sand-900 border border-olive-500/40 p-8 sm:p-10 flex flex-col justify-between text-left shadow-2xl rounded-3xl overflow-y-auto custom-scrollbar">
+                    <div className="flex items-center justify-between w-full pb-3 border-b border-sand-800">
+                      <span className="px-3.5 py-1 rounded-full text-xs font-mono uppercase tracking-wider bg-olive-500/20 text-olive-300 font-bold border border-olive-500/30">
                         {displayedCards[cardIndex]?.topic || 'Theory Breakdown'}
                       </span>
-                      <span className="text-[10px] font-mono text-clay-300">Back (Synthesis)</span>
+                      <span className="text-xs font-mono text-olive-300 font-medium">Back (Synthesis)</span>
                     </div>
 
-                    <div className="my-4 text-xs sm:text-sm text-sand-200 leading-relaxed whitespace-pre-line space-y-2 overflow-y-auto custom-scrollbar max-h-[240px]">
+                    <div className="my-4 text-sm sm:text-base text-sand-100 font-normal leading-relaxed whitespace-pre-line space-y-2 overflow-y-auto custom-scrollbar max-h-[260px]">
                       {displayedCards[cardIndex]?.answer}
                     </div>
 
-                    <div className="flex items-center justify-between text-xs text-sand-400 pt-3 border-t border-clay-500/20">
+                    <div className="flex items-center justify-between text-xs sm:text-sm text-sand-400 pt-3 border-t border-sand-800/60 w-full">
                       <span>Card {cardIndex + 1} of {displayedCards.length}</span>
-                      <span className="text-clay-400 font-semibold">Click to flip back</span>
+                      <span className="text-olive-400 font-semibold">Click to flip back</span>
                     </div>
                   </div>
                 </div>
@@ -845,7 +875,7 @@ export default function TheoryExplorer({
                     setIsFlipped(false);
                   }}
                   disabled={cardIndex === 0}
-                  className="p-3 rounded-2xl bg-sand-900 border border-sand-800 text-sand-300 hover:text-sand-50 hover:bg-sand-800 transition disabled:opacity-40 disabled:cursor-not-allowed shadow-md"
+                  className="p-3.5 rounded-2xl bg-sand-900 border border-sand-800 text-sand-200 hover:text-sand-50 hover:bg-sand-800 transition disabled:opacity-40 disabled:cursor-not-allowed shadow-md"
                   title="Previous card"
                 >
                   <ChevronLeft className="w-5 h-5" />
@@ -860,8 +890,8 @@ export default function TheoryExplorer({
                         setCardIndex(i);
                         setIsFlipped(false);
                       }}
-                      className={`h-2 rounded-full transition-all ${
-                        cardIndex === i ? 'w-8 bg-clay-500 shadow-md shadow-sand-300/25' : 'w-2 bg-sand-800 hover:bg-sand-700'
+                      className={`h-2.5 rounded-full transition-all ${
+                        cardIndex === i ? 'w-8 bg-clay-500 shadow-md shadow-sand-300/25' : 'w-2.5 bg-sand-800 hover:bg-sand-700'
                       }`}
                     />
                   ))}
@@ -874,7 +904,7 @@ export default function TheoryExplorer({
                     setIsFlipped(false);
                   }}
                   disabled={cardIndex === displayedCards.length - 1}
-                  className="p-3 rounded-2xl bg-sand-900 border border-sand-800 text-sand-300 hover:text-sand-50 hover:bg-sand-800 transition disabled:opacity-40 disabled:cursor-not-allowed shadow-md"
+                  className="p-3.5 rounded-2xl bg-sand-900 border border-sand-800 text-sand-200 hover:text-sand-50 hover:bg-sand-800 transition disabled:opacity-40 disabled:cursor-not-allowed shadow-md"
                   title="Next card"
                 >
                   <ChevronRight className="w-5 h-5" />
@@ -882,7 +912,7 @@ export default function TheoryExplorer({
               </div>
             </div>
           ) : (
-            <div className="text-center py-12 text-sand-500 text-xs font-mono">
+            <div className="text-center py-12 text-sand-500 text-sm font-mono">
               No flashcards available for this chapter.
             </div>
           )}

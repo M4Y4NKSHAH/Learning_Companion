@@ -514,9 +514,9 @@ export default function CourseStudioView({
                 </button>
                 <button
                   type="submit"
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-clay-600 via-amber-600 to-ember-600 hover:from-clay-500 hover:to-ember-500 shadow-xl shadow-sand-300/25 transition active:scale-95"
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-clay-600 via-ember-600 to-olive-600 hover:from-clay-500 hover:to-olive-500 shadow-xl shadow-sand-300/25 transition active:scale-95"
                 >
-                  <Sparkles className="w-4 h-4 text-yellow-300" />
+                  <Sparkles className="w-4 h-4 text-ember-300" />
                   Process & Build Curriculum
                 </button>
               </div>
@@ -586,19 +586,19 @@ export default function CourseStudioView({
                       <div>
                         <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                           {isCustom ? (
-                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-clay-500/20 text-clay-300 border border-clay-500/30">
+                            <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-clay-500/20 text-clay-300 border border-clay-500/30">
                               Custom Ingested
                             </span>
                           ) : (
-                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-ember-500/20 text-ember-300 border border-ember-500/30">
+                            <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-ember-500/20 text-ember-300 border border-ember-500/30">
                               Standard
                             </span>
                           )}
-                          <span className="text-[10px] text-sand-400 font-mono">
+                          <span className="text-xs text-sand-400 font-mono">
                             {c.subject} • {c.academic_tier}
                           </span>
                         </div>
-                        <h4 className="text-sm font-bold text-sand-50 line-clamp-1">{c.title}</h4>
+                        <h4 className="text-base font-bold text-sand-50 line-clamp-1">{c.title}</h4>
                       </div>
 
                       {isCustom && onDeleteCourse && (
@@ -617,7 +617,7 @@ export default function CourseStudioView({
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between text-[11px] text-sand-400 pt-2 border-t border-sand-800/60 font-mono">
+                    <div className="flex items-center justify-between text-xs text-sand-400 pt-2 border-t border-sand-800/60 font-mono">
                       <div className="flex items-center gap-2">
                         <span>{c.chapters_count || c.chapters?.length || 1} Ch</span>
                         <span>•</span>
@@ -631,7 +631,7 @@ export default function CourseStudioView({
                           onSelectCourse(c);
                           onNavigateToStudy?.();
                         }}
-                        className="text-[10px] text-clay-400 hover:text-clay-300 font-bold flex items-center gap-1"
+                        className="text-xs text-clay-400 hover:text-clay-300 font-bold flex items-center gap-1"
                       >
                         Study <ChevronRight className="w-3 h-3" />
                       </button>
@@ -668,40 +668,40 @@ export default function CourseStudioView({
                   <div className="flex items-center gap-2 shrink-0">
                     <button
                       onClick={() => onNavigateToStudy?.()}
-                      className="px-4 py-2 bg-gradient-to-r from-clay-600 to-amber-600 hover:from-clay-500 hover:to-amber-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-sand-300/25 transition flex items-center gap-1.5 active:scale-95"
+                      className="px-4 py-2 bg-gradient-to-r from-clay-600 via-ember-600 to-olive-600 hover:from-clay-500 hover:to-olive-500 text-white text-xs sm:text-sm font-bold rounded-xl shadow-lg shadow-sand-300/25 transition flex items-center gap-1.5 active:scale-95"
                     >
-                      <BookOpen className="w-3.5 h-3.5" />
+                      <BookOpen className="w-4 h-4" />
                       Study Theory
                     </button>
                     <button
                       onClick={onNavigateToPractice}
-                      className="px-4 py-2 bg-sand-800 hover:bg-sand-700 text-sand-50 text-xs font-bold rounded-xl border border-sand-700 transition flex items-center gap-1.5 active:scale-95"
+                      className="px-4 py-2 bg-sand-800 hover:bg-sand-700 text-sand-50 text-xs sm:text-sm font-bold rounded-xl border border-sand-700 transition flex items-center gap-1.5 active:scale-95"
                     >
-                      <BrainCircuit className="w-3.5 h-3.5 text-olive-400" />
+                      <BrainCircuit className="w-4 h-4 text-olive-400" />
                       Practice Lab
                     </button>
                   </div>
                 </div>
 
                 {/* Course Summary Metrics Bar */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="p-3.5 rounded-xl bg-sand-900/60 border border-sand-800">
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-sand-400 block mb-0.5">Chapters</span>
-                    <span className="text-lg font-bold text-sand-50">{activeCourse.chapters?.length || activeCourse.chapters_count || 1}</span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+                  <div className="p-4 rounded-xl bg-sand-900/60 border border-sand-800">
+                    <span className="text-xs font-mono uppercase tracking-wider text-sand-400 block mb-1">Chapters</span>
+                    <span className="text-xl sm:text-2xl font-bold text-sand-50">{activeCourse.chapters?.length || activeCourse.chapters_count || 1}</span>
                   </div>
-                  <div className="p-3.5 rounded-xl bg-sand-900/60 border border-sand-800">
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-sand-400 block mb-0.5">Total Sections</span>
-                    <span className="text-lg font-bold text-sand-50">
+                  <div className="p-4 rounded-xl bg-sand-900/60 border border-sand-800">
+                    <span className="text-xs font-mono uppercase tracking-wider text-sand-400 block mb-1">Total Sections</span>
+                    <span className="text-xl sm:text-2xl font-bold text-sand-50">
                       {activeCourse.chapters?.reduce((acc, ch) => acc + (ch.sections_count || ch.subsections?.length || 0), 0) || '---'}
                     </span>
                   </div>
-                  <div className="p-3.5 rounded-xl bg-sand-900/60 border border-sand-800">
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-sand-400 block mb-0.5">Flashcards</span>
-                    <span className="text-lg font-bold text-sand-50">{activeCourse.flashcards_count || activeCourse.cards?.length || 0}</span>
+                  <div className="p-4 rounded-xl bg-sand-900/60 border border-sand-800">
+                    <span className="text-xs font-mono uppercase tracking-wider text-sand-400 block mb-1">Flashcards</span>
+                    <span className="text-xl sm:text-2xl font-bold text-sand-50">{activeCourse.flashcards_count || activeCourse.cards?.length || 0}</span>
                   </div>
-                  <div className="p-3.5 rounded-xl bg-sand-900/60 border border-sand-800">
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-sand-400 block mb-0.5">Quizzes & Exams</span>
-                    <span className="text-lg font-bold text-sand-50">{activeCourse.quizzes_count || activeCourse.quizzes?.length || 0}</span>
+                  <div className="p-4 rounded-xl bg-sand-900/60 border border-sand-800">
+                    <span className="text-xs font-mono uppercase tracking-wider text-sand-400 block mb-1">Quizzes & Exams</span>
+                    <span className="text-xl sm:text-2xl font-bold text-sand-50">{activeCourse.quizzes_count || activeCourse.quizzes?.length || 0}</span>
                   </div>
                 </div>
 
@@ -724,12 +724,12 @@ export default function CourseStudioView({
                       <div key={group.unitIndex ?? `g${gi}`} className="space-y-3">
                         {group.unitName && (
                           <div className="flex items-center gap-3 pt-1">
-                            <span className="px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider bg-clay-500/15 text-clay-300 border border-clay-500/30 shrink-0">
+                            <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold uppercase tracking-wider bg-clay-500/15 text-clay-300 border border-clay-500/30 shrink-0">
                               Unit {group.unitIndex}
                             </span>
                             <h5 className="text-sm font-bold text-sand-100 truncate">{group.unitName}</h5>
                             <span className="flex-1 h-px bg-sand-800" />
-                            <span className="text-[10px] font-mono text-sand-500 shrink-0">
+                            <span className="text-xs font-mono text-sand-500 shrink-0">
                               {group.chapters.length} chapter{group.chapters.length === 1 ? '' : 's'}
                             </span>
                           </div>
@@ -745,10 +745,10 @@ export default function CourseStudioView({
                             >
                               <div className="flex items-start justify-between gap-3 mb-2.5">
                                 <div className="flex items-center gap-2.5">
-                                  <span className="w-6 h-6 rounded-lg bg-clay-500/20 text-clay-300 font-mono text-xs font-bold flex items-center justify-center border border-clay-500/30 shrink-0">
+                                  <span className="w-7 h-7 rounded-lg bg-clay-500/20 text-clay-300 font-mono text-xs font-bold flex items-center justify-center border border-clay-500/30 shrink-0">
                                     {chIndex}
                                   </span>
-                                  <h5 className="text-sm font-bold text-sand-50 group-hover:text-clay-300 transition">{ch.title}</h5>
+                                  <h5 className="text-base sm:text-lg font-bold text-sand-50 group-hover:text-clay-300 transition">{ch.title}</h5>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
                                   {ch.theory_source && (
@@ -758,9 +758,9 @@ export default function CourseStudioView({
                                           ? 'Theory enriched by the fine-tuned local Llama model'
                                           : 'Theory built offline from the source text'
                                       }
-                                      className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                                      className={`text-xs font-mono px-2.5 py-0.5 rounded border font-semibold ${
                                         ch.theory_source === 'llm'
-                                          ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                                          ? 'bg-ember-500/15 text-ember-300 border-ember-500/30'
                                           : 'bg-olive-500/15 text-olive-300 border-olive-500/30'
                                       }`}
                                     >
@@ -768,56 +768,67 @@ export default function CourseStudioView({
                                     </span>
                                   )}
                                   {sectionCount > 0 && (
-                                    <span className="text-[10px] font-mono text-sand-400 bg-sand-950 px-2 py-0.5 rounded border border-sand-800">
+                                    <span className="text-xs font-mono text-sand-400 bg-sand-950 px-2.5 py-0.5 rounded border border-sand-800 font-semibold">
                                       {sectionCount} Sections
                                     </span>
                                   )}
-                                  <span className="text-[10px] font-mono text-sand-400 bg-sand-950 px-2 py-0.5 rounded border border-sand-800">
+                                  <span className="text-xs font-mono text-sand-400 bg-sand-950 px-2.5 py-0.5 rounded border border-sand-800 font-semibold">
                                     {(ch.cards || []).length} Cards
                                   </span>
 
                                   {/* Direct chapter study trigger */}
                                   <button
                                     onClick={() => onNavigateToStudy?.(chIndex - 1)}
-                                    className="p-1 rounded-lg text-sand-400 hover:text-clay-300 hover:bg-sand-800 transition"
+                                    className="p-1.5 rounded-lg text-sand-400 hover:text-clay-300 hover:bg-sand-800 transition"
                                     title="Open this chapter in Theory Explorer"
                                   >
-                                    <ArrowRight className="w-3.5 h-3.5" />
+                                    <ArrowRight className="w-4 h-4" />
                                   </button>
                                 </div>
                               </div>
 
-                              <p className="text-xs text-sand-300 leading-relaxed mb-3 pl-8">
+                              <p className="text-sm text-sand-200 leading-relaxed mb-3 pl-9">
                                 {ch.summary || 'Essential theoretical principles and governing relationships.'}
                               </p>
 
-                              {ch.subsections?.length > 0 && (
-                                <div className="pl-8 pb-2 flex flex-wrap gap-1.5">
-                                  {ch.subsections.slice(0, 8).map((sub, sIdx) => (
-                                    <span
-                                      key={sub.section_id || sIdx}
-                                      title={sub.title}
-                                      className="text-[10px] font-mono text-sand-400 bg-sand-950/80 px-2 py-0.5 rounded border border-sand-800/70"
-                                    >
-                                      {sub.label || sIdx + 1}
-                                    </span>
-                                  ))}
-                                  {ch.subsections.length > 8 && (
-                                    <span className="text-[10px] font-mono text-sand-500 px-1 py-0.5">
-                                      +{ch.subsections.length - 8} more
-                                    </span>
-                                  )}
-                                </div>
-                              )}
+                                {ch.subsections?.length > 0 && (() => {
+                                const seen = new Set();
+                                const deduped = ch.subsections.filter((s, sIdx) => {
+                                  const normLabel = (s.label || s.sec_idx || '').toString().trim().toLowerCase();
+                                  const normTitle = (s.title || '').toString().trim().toLowerCase();
+                                  const key = normLabel || normTitle || String(sIdx);
+                                  if (seen.has(key)) return false;
+                                  seen.add(key);
+                                  return true;
+                                });
+                                return (
+                                  <div className="pl-9 pb-2 flex flex-wrap gap-1.5">
+                                    {deduped.slice(0, 8).map((sub, sIdx) => (
+                                      <span
+                                        key={sub.section_id || sIdx}
+                                        title={sub.title}
+                                        className="text-xs font-mono text-sand-400 bg-sand-950/80 px-2.5 py-0.5 rounded border border-sand-800/70 font-semibold"
+                                      >
+                                        {sub.label || sIdx + 1}
+                                      </span>
+                                    ))}
+                                    {deduped.length > 8 && (
+                                      <span className="text-xs font-mono text-sand-500 px-1 py-0.5">
+                                        +{deduped.length - 8} more
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })()}
 
                               {ch.objectives && ch.objectives.length > 0 && (
-                                <div className="pl-8 pt-2.5 border-t border-sand-800/60 flex flex-wrap gap-2">
+                                <div className="pl-9 pt-2.5 border-t border-sand-800/60 flex flex-wrap gap-2">
                                   {ch.objectives.map((obj, oIdx) => (
                                     <span
                                       key={oIdx}
-                                      className="text-[10px] bg-sand-950/80 text-sand-400 px-2.5 py-1 rounded-lg border border-sand-800/80 flex items-center gap-1.5"
+                                      className="text-xs bg-sand-950/80 text-sand-300 px-3 py-1 rounded-lg border border-sand-800/80 flex items-center gap-1.5 font-medium"
                                     >
-                                      <Check className="w-3 h-3 text-olive-400 shrink-0" />
+                                      <Check className="w-3.5 h-3.5 text-olive-400 shrink-0" />
                                       <span>{obj}</span>
                                     </span>
                                   ))}

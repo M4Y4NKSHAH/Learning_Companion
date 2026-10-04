@@ -169,7 +169,9 @@ def _find_best_matching_chapter(target_title: str, raw_chapters: list[dict]) -> 
 
 # --- MATERIAL INGESTION & PIPELINE HELPER ---
 def _smart_divide_material(text: str, title: str, subject: str,
-                           academic_tier: str) -> list:
+                           academic_tier: str,
+                           extracted_book: Optional[Any] = None,
+                           path: Optional[str] = None) -> list:
     """Book-agnostic division of an uploaded document.
 
     Infers this document's own chapter/section/unit layout (see
@@ -181,7 +183,9 @@ def _smart_divide_material(text: str, title: str, subject: str,
     try:
         from divide_book import SmartBookDivider
         divider = SmartBookDivider(text=text, title=title, subject=subject,
-                                   tier=academic_tier)
+                                   tier=academic_tier,
+                                   extracted_book=extracted_book,
+                                   path=path)
         if not divider.plan.chapter_matches or divider.plan.chapter_kind in ("none", "titled_caps"):
             return []
         chapters = divider.divide()
@@ -237,7 +241,9 @@ def process_and_ingest_material(
     enrich_count: Optional[int] = None,
     enrich_chapters: Optional[str] = None,
     include_cards: bool = True,
-    resume: bool = False
+    resume: bool = False,
+    extracted_book: Optional[Any] = None,
+    source_path: Optional[str] = None
 ) -> dict:
     """
     Enterprise Ingestion Pipeline — two-phase, so the learner never waits.
@@ -271,7 +277,8 @@ def process_and_ingest_material(
     # 1. Detect / Decompose into chapters dynamically (any layout, any length).
     # The smart divider infers this document's own heading style; the simple
     # parser remains as the fallback for very short or structure-less material.
-    raw_chapters = _smart_divide_material(clean_text, title, subject, academic_tier)
+    raw_chapters = _smart_divide_material(clean_text, title, subject, academic_tier,
+                                          extracted_book=extracted_book, path=source_path)
     if not raw_chapters:
         raw_chapters = MaterialParser.detect_outline_or_chapters(clean_text, max_chapters=None)
     if not raw_chapters:
@@ -328,7 +335,7 @@ def process_and_ingest_material(
         # deterministic skeleton in milliseconds, so the course is complete now.
         theory_data = qge.generate_chapter_theory_and_cards(
             chapter_title=ch_title,
-            chapter_text=ch_content[:3500],
+            chapter_text=ch_content[:9000],
             subject=subject,
             tier=academic_tier,
             chapter_index=ch_idx,
@@ -338,25 +345,6 @@ def process_and_ingest_material(
 
         ch_cards = theory_data.get("cards", [])
         all_cards.extend(ch_cards)
-
-        if job_id and job_id in INGESTION_JOBS:
-            INGESTION_JOBS[job_id]["current_step"] = 4
-            INGESTION_JOBS[job_id]["current_message"] = f"Vectorizing knowledge chunks for Chapter {idx}..."
-
-        # Vectorize chunks into ChromaDB with strict chapter_id and chapter_title isolation
-        chunks = MaterialParser.create_semantic_chunks(ch_content[:8000], chunk_size=400, overlap=40)[:15]
-        try:
-            db_pipeline.ingest_custom_chunks(
-                course_id=course_id,
-                chunks=chunks,
-                subject=subject,
-                academic_tier=academic_tier,
-                chapter_id=ch_id,
-                chapter_index=ch_idx,
-                chapter_title=ch_title
-            )
-        except Exception as ve:
-            print(f"[ChromaDB] Vector ingestion warning: {ve}")
 
         processed_chapters.append({
             "chapter_id": ch_id,
@@ -377,27 +365,55 @@ def process_and_ingest_material(
             "content_preview": ch_content[:400] + "..." if len(ch_content) > 400 else ch_content
         })
 
-    # ---- Publish the complete skeleton course NOW: the learner can open it --- #
+    # ---- Publish the complete skeleton course NOW: the learner can open it immediately (~1-2s) --- #
     course_record = _assemble_course_record(
         course_id, title, subject, academic_tier, processed_chapters,
         all_cards, quizzes=[], final_exam=[], enriched_count=0)
     _persist_course(course_record)
-    print(f"[Ingestion] [{course_id}] published with all {total_raw} chapters "
-          f"(grounded deterministic theory). Selective enrichment begins now.")
+    print(f"[Ingestion] [{course_id}] published skeleton with all {total_raw} chapters "
+          f"(grounded deterministic theory). Instantaneous Phase A publication complete.")
 
     if job_id and job_id in INGESTION_JOBS:
+        INGESTION_JOBS[job_id]["course_ready"] = True
+        INGESTION_JOBS[job_id]["course"] = course_record
         INGESTION_JOBS[job_id]["current_step"] = 3
         INGESTION_JOBS[job_id]["current_message"] = (
             f"Course ready to study! Now enriching {planned}/{total_raw} "
             f"chapter(s) with the local Llama..." if planned
-            else "Synthesizing quizzes & final exam...")
+            else "Course skeleton published instantaneously! Course is ready to study.")
         INGESTION_JOBS[job_id]["progress"] = 55
-        # Publish the coverage counters up-front so the UI can render a 0/N bar
-        # from the very first poll instead of waiting for chapter one to land.
         if planned:
             INGESTION_JOBS[job_id]["chapters_total"] = total_raw
             INGESTION_JOBS[job_id]["chapters_enriched"] = 0
             INGESTION_JOBS[job_id]["eta_seconds"] = None
+
+    # ---- Batch vectorize knowledge chunks into ChromaDB (non-blocking for course availability) --- #
+    try:
+        batch_items = []
+        for ch in raw_chapters:
+            ch_idx = ch.get("chapter_index", 1)
+            ch_id = ch.get("chapter_id") or f"ch_{ch_idx}"
+            ch_title = ch.get("title", f"Chapter {ch_idx}")
+            ch_content = ch.get("content") or ch.get("full_text", "")
+            chunks = MaterialParser.create_semantic_chunks(ch_content[:8000], chunk_size=400, overlap=40)[:15]
+            if chunks:
+                batch_items.append({
+                    "course_id": course_id,
+                    "chunks": chunks,
+                    "subject": subject,
+                    "academic_tier": academic_tier,
+                    "chapter_id": ch_id,
+                    "chapter_index": ch_idx,
+                    "chapter_title": ch_title,
+                })
+
+        if hasattr(db_pipeline, "ingest_custom_chunks_batch"):
+            db_pipeline.ingest_custom_chunks_batch(batch_items)
+        else:
+            for item in batch_items:
+                db_pipeline.ingest_custom_chunks(**item)
+    except Exception as ve:
+        print(f"[ChromaDB] Vector ingestion warning: {ve}")
 
     # ---- Phase B: selective Llama enrichment with measured progress --------- #
     if planned:
@@ -578,7 +594,9 @@ def _async_ingest_worker(
     enrich_count: Optional[int] = None,
     enrich_chapters: Optional[str] = None,
     include_cards: bool = True,
-    resume: bool = False
+    resume: bool = False,
+    extracted_book: Optional[Any] = None,
+    source_path: Optional[str] = None
 ):
     """Background worker executing dynamic ingestion without blocking web responses."""
     try:
@@ -592,7 +610,9 @@ def _async_ingest_worker(
             enrich_count=enrich_count,
             enrich_chapters=enrich_chapters,
             include_cards=include_cards,
-            resume=resume
+            resume=resume,
+            extracted_book=extracted_book,
+            source_path=source_path
         )
     except Exception as e:
         print(f"[Async Ingestion Worker] Error processing {title}: {e}")
@@ -694,7 +714,16 @@ async def upload_material_file(
         filename = (file.filename or "uploaded_document").lower()
         clean_title = title.strip() if (title and title.strip()) else os.path.splitext(file.filename or "Uploaded Material")[0]
 
-        if filename.endswith((".pdf", ".epub", ".mobi", ".xps", ".fb2")):
+        extracted_book = None
+        if filename.endswith(".pdf") or contents.startswith(b"%PDF"):
+            try:
+                from book_extract import extract_pdf
+                extracted_book = extract_pdf(contents)
+                extracted_text = extracted_book.text
+            except Exception as e:
+                print(f"[Upload] extract_pdf failed: {e}. Falling back to bytes extraction.")
+                extracted_text = MaterialParser.extract_text_from_document_bytes(contents, filename=file.filename or "")
+        elif filename.endswith((".epub", ".mobi", ".xps", ".fb2")):
             extracted_text = MaterialParser.extract_text_from_document_bytes(contents, filename=file.filename or "")
         else:
             extracted_text = contents.decode("utf-8", errors="replace")
@@ -730,7 +759,8 @@ async def upload_material_file(
                 enrich_count=enrich_count,
                 enrich_chapters=enrich_chapters,
                 include_cards=include_cards if include_cards is not None else True,
-                resume=resume if resume is not None else False
+                resume=resume if resume is not None else False,
+                extracted_book=extracted_book
             )
             return {
                 "status": "processing",
@@ -748,7 +778,8 @@ async def upload_material_file(
             enrich_count=enrich_count,
             enrich_chapters=enrich_chapters,
             include_cards=include_cards if include_cards is not None else True,
-            resume=resume if resume is not None else False
+            resume=resume if resume is not None else False,
+            extracted_book=extracted_book
         )
         return {
             "status": "success",

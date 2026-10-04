@@ -1204,61 +1204,61 @@ export default function App() {
         <div className="hidden lg:flex items-center bg-sand-900/80 p-1 rounded-xl border border-sand-800 shadow-inner">
           <button
             onClick={() => setActiveView('studio')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
               activeView === 'studio'
                 ? 'bg-clay-600 text-white shadow-md shadow-sand-300/25'
                 : 'text-sand-400 hover:text-sand-200 hover:bg-sand-800/50'
             }`}
           >
-            <Layers className="w-3.5 h-3.5" />
+            <Layers className="w-4 h-4" />
             <span>Course Studio</span>
           </button>
 
           <button
             onClick={() => setActiveView('theory')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
               activeView === 'theory'
-                ? 'bg-clay-600 text-white shadow-md shadow-sand-300/25'
+                ? 'bg-ember-600 text-white shadow-md shadow-sand-300/25'
                 : 'text-sand-400 hover:text-sand-200 hover:bg-sand-800/50'
             }`}
           >
-            <BookOpen className="w-3.5 h-3.5" />
+            <BookOpen className="w-4 h-4" />
             <span>Study Deck</span>
           </button>
 
           <button
             onClick={() => setActiveView('quiz')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
               activeView === 'quiz'
                 ? 'bg-olive-600 text-white shadow-md shadow-sand-300/25'
                 : 'text-sand-400 hover:text-sand-200 hover:bg-sand-800/50'
             }`}
           >
-            <HelpCircle className="w-3.5 h-3.5" />
+            <HelpCircle className="w-4 h-4" />
             <span>Practice Lab</span>
           </button>
 
           <button
             onClick={() => setActiveView('final_exam')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
               activeView === 'final_exam'
-                ? 'bg-ember-600 text-white shadow-md shadow-sand-300/25'
+                ? 'bg-clay-600 text-white shadow-md shadow-sand-300/25'
                 : 'text-sand-400 hover:text-sand-200 hover:bg-sand-800/50'
             }`}
           >
-            <Bookmark className="w-3.5 h-3.5" />
+            <Bookmark className="w-4 h-4" />
             <span>Evaluation Exam</span>
           </button>
 
           <button
             onClick={() => setActiveView('telemetry')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
               activeView === 'telemetry'
-                ? 'bg-sand-800 text-clay-300 border border-clay-500/30 shadow-md'
+                ? 'bg-sand-800 text-sand-50 border border-sand-700 shadow-md'
                 : 'text-sand-400 hover:text-sand-200 hover:bg-sand-800/50'
             }`}
           >
-            <Activity className="w-3.5 h-3.5" />
+            <Activity className="w-4 h-4" />
             <span>Telemetry</span>
           </button>
         </div>
@@ -1304,9 +1304,9 @@ export default function App() {
 
           <button
             onClick={() => setIsIngestionModalOpen(true)}
-            className="bg-gradient-to-r from-clay-600 via-amber-600 to-ember-600 hover:from-clay-500 hover:to-ember-500 text-white text-xs font-bold px-3.5 py-1.5 rounded-xl shadow-lg shadow-sand-300/25 transition-all flex items-center gap-1.5 border border-clay-400/30 active:scale-95"
+            className="bg-gradient-to-r from-clay-600 via-ember-600 to-olive-600 hover:from-clay-500 hover:to-olive-500 text-white text-xs sm:text-sm font-bold px-4 py-2 rounded-xl shadow-lg shadow-sand-300/25 transition-all flex items-center gap-1.5 border border-clay-400/30 active:scale-95"
           >
-            <Plus className="w-3.5 h-3.5 text-yellow-300" />
+            <Plus className="w-4 h-4 text-white" />
             <span>Ingest Material</span>
           </button>
         </div>
@@ -1426,15 +1426,15 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     {mockErrors >= 2 && (
-                      <span className="text-[10px] font-mono text-amber-800 border border-amber-500/40 px-2.5 py-1 rounded-full bg-amber-500/10 flex items-center gap-1">
-                        <Zap className="w-3 h-3 text-amber-800 animate-pulse" />
+                      <span className="text-xs font-mono text-ember-300 border border-ember-500/40 px-3 py-1 rounded-full bg-ember-500/15 flex items-center gap-1.5 font-semibold">
+                        <Zap className="w-3.5 h-3.5 text-ember-400 animate-pulse" />
                         Direct Solution Threshold Active
                       </span>
                     )}
-                    <span className="text-[10px] font-mono text-olive-400 border border-olive-500/30 px-3 py-1 rounded-full bg-olive-500/10 flex items-center gap-1.5">
-                      <Sparkles className="w-3 h-3 text-olive-400 animate-pulse" />
+                    <span className="text-xs font-mono text-olive-300 border border-olive-500/30 px-3 py-1 rounded-full bg-olive-500/15 flex items-center gap-1.5 font-semibold">
+                      <Sparkles className="w-3.5 h-3.5 text-olive-400 animate-pulse" />
                       Adaptive Depth Socratic Tutor
                     </span>
                   </div>
@@ -1443,7 +1443,7 @@ export default function App() {
                 {/* Concept Question Banner */}
                 <div className="bg-gradient-to-r from-sand-950 via-sand-900 to-olive-950/30 border border-sand-800 p-5 rounded-2xl border-l-4 border-l-olive-500 shadow-lg">
                   <div className="flex items-center justify-between gap-2 mb-1">
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-olive-400 font-bold">
+                    <span className="text-xs font-mono uppercase tracking-widest text-olive-400 font-bold">
                       Active Problem Statement
                     </span>
                     {quizzes.length > 1 && (
@@ -1456,10 +1456,10 @@ export default function App() {
                               setChatLog([]);
                               setMockErrors(0);
                             }}
-                            className={`text-[9px] font-mono px-2 py-0.5 rounded-md border transition-all ${
+                            className={`text-xs font-mono px-2.5 py-1 rounded-md border transition-all ${
                               currentQuestion?.id === q.id
                                 ? 'bg-olive-500/20 border-olive-500/50 text-olive-300 font-bold'
-                                : 'bg-sand-900/80 border-sand-800 text-sand-400 hover:text-sand-200'
+                                : 'bg-sand-900/80 border-sand-800 text-sand-300 hover:text-sand-100'
                             }`}
                           >
                             Question {qIdx + 1}
@@ -1468,46 +1468,46 @@ export default function App() {
                       </div>
                     )}
                   </div>
-                  <p className="text-sm text-sand-100 font-semibold leading-relaxed">{currentQuestion.text}</p>
+                  <p className="text-sm sm:text-base text-sand-50 font-semibold leading-relaxed">{currentQuestion.text}</p>
                 </div>
 
                 {/* Conversation Log */}
                 <div className="h-[360px] overflow-y-auto space-y-4 custom-scrollbar p-3 bg-sand-950/60 rounded-2xl border border-sand-900">
                   {chatLog.length === 0 ? (
-                    <div className="text-sand-400 text-xs text-center pt-24 space-y-2">
-                      <p className="font-semibold text-sand-300">Ask a question, propose a solution, or test your intuition...</p>
-                      <p className="text-[11px] text-sand-600 font-mono">
+                    <div className="text-sand-400 text-sm text-center pt-24 space-y-2">
+                      <p className="font-semibold text-sand-200">Ask a question, propose a solution, or test your intuition...</p>
+                      <p className="text-xs text-sand-500 font-mono">
                         The tutor adapts to surface intuition, mathematical steps, or remedial guidance based on your responses.
                       </p>
                     </div>
                   ) : (
                     chatLog.map((chat, idx) => (
                       <div key={idx} className={`flex w-full ${chat.sender === 'student' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[85%] text-xs p-4 rounded-2xl border shadow-lg ${
+                        <div className={`max-w-[85%] text-sm p-4 rounded-2xl border shadow-lg ${
                           chat.sender === 'student' 
-                            ? 'bg-gradient-to-r from-ember-900/40 to-amber-900/40 border-ember-500/30 text-ember-100 rounded-br-none' 
-                            : 'bg-gradient-to-br from-sand-900 via-sand-950 to-olive-950/30 border-sand-800 text-sand-200 rounded-bl-none'
+                            ? 'bg-sand-900 border-sand-700 text-sand-50 rounded-br-none font-medium' 
+                            : 'bg-gradient-to-br from-sand-900 via-sand-950 to-sand-900 border-sand-800 text-sand-100 rounded-bl-none'
                         }`}>
                           <div className="flex items-center justify-between gap-2 border-b border-sand-800/60 pb-2 mb-2">
-                            <span className="text-[10px] font-mono text-sand-400 font-bold uppercase tracking-widest">
+                            <span className="text-xs font-mono text-sand-400 font-bold uppercase tracking-widest">
                               {chat.sender === 'student' ? 'Student Input' : 'Socratic Tutor Response'}
                             </span>
                             {chat.sender !== 'student' && (
                               <div className="flex items-center gap-1.5">
                                 {chat.mamdani && (
-                                  <span className="text-[9px] font-mono text-olive-400 bg-olive-950/40 border border-olive-500/30 px-1.5 py-0.5 rounded">
+                                  <span className="text-xs font-mono text-olive-400 bg-olive-950/40 border border-olive-500/30 px-2 py-0.5 rounded">
                                     FIS: {Math.round(chat.mamdani.fuzzy_score)}%
                                   </span>
                                 )}
-                                <span className={`text-[9px] font-mono px-2.5 py-0.5 rounded-full border ${
+                                <span className={`text-xs font-mono px-2.5 py-0.5 rounded-full border ${
                                   chat.depth === 'guardrail_deflection'
-                                    ? 'bg-rose-950/70 border-rose-500/50 text-rose-300 font-semibold shadow-sm'
+                                    ? 'bg-clay-500/15 border-clay-500/40 text-clay-300 font-semibold shadow-sm'
                                     : chat.depth === 'deep' 
                                     ? 'bg-clay-950/60 border-clay-500/40 text-clay-300'
                                     : (chat.depth === 'solution' || chat.depth === 'remedial')
                                     ? 'bg-clay-950/60 border-clay-500/40 text-clay-300'
                                     : chat.depth === 'hint'
-                                    ? 'bg-amber-500/10 border-amber-500/40 text-amber-800'
+                                    ? 'bg-ember-500/15 border-ember-500/40 text-ember-300 font-semibold'
                                     : 'bg-olive-950/60 border-olive-500/40 text-olive-300'
                                 }`}>
                                   {chat.depth === 'guardrail_deflection' ? '🎯 Course Guardrail' : chat.depth === 'deep' ? '🔮 Deep Inquiry' : (chat.depth === 'solution' || chat.depth === 'remedial') ? '⚡ Direct Solution' : chat.depth === 'hint' ? '💡 Socratic Hint' : '🌱 Concept Guide'}
@@ -1523,33 +1523,33 @@ export default function App() {
                 </div>
 
                 {/* Quick Inquiry Chips */}
-                <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-1 text-xs font-mono">
-                  <span className="text-sand-500 text-[11px] whitespace-nowrap">Suggested Prompts:</span>
+                <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-1 text-xs sm:text-sm font-mono">
+                  <span className="text-sand-500 text-xs sm:text-sm whitespace-nowrap">Suggested Prompts:</span>
                   <button
                     onClick={() => submitQuizAnswer("Can you give me a hint for this question?", "hint")}
                     disabled={loading}
-                    className="bg-olive-950/80 hover:bg-olive-900/80 border border-olive-500/40 px-3 py-1.5 rounded-full text-olive-300 whitespace-nowrap transition flex items-center gap-1 font-semibold shadow-sm"
+                    className="bg-olive-950/80 hover:bg-olive-900/80 border border-olive-500/40 px-3.5 py-1.5 rounded-full text-olive-300 whitespace-nowrap transition flex items-center gap-1 font-semibold shadow-sm"
                   >
                     💡 Request a Hint
                   </button>
                   <button
                     onClick={() => submitQuizAnswer("Explain the core intuitive concept simply with a real-world example.", "discussion")}
                     disabled={loading}
-                    className="bg-sand-900 hover:bg-sand-800 border border-sand-800 px-3 py-1.5 rounded-full text-amber-800 whitespace-nowrap transition"
+                    className="bg-sand-900 hover:bg-sand-800 border border-sand-800 px-3.5 py-1.5 rounded-full text-ember-300 whitespace-nowrap transition font-semibold"
                   >
                     🌱 Core Intuition
                   </button>
                   <button
                     onClick={() => submitQuizAnswer("Show the step-by-step formula derivation and mathematical relationship.", "discussion")}
                     disabled={loading}
-                    className="bg-sand-900 hover:bg-sand-800 border border-sand-800 px-3 py-1.5 rounded-full text-clay-300 whitespace-nowrap transition"
+                    className="bg-sand-900 hover:bg-sand-800 border border-sand-800 px-3.5 py-1.5 rounded-full text-clay-300 whitespace-nowrap transition font-semibold"
                   >
                     🔮 Formula Steps
                   </button>
                   <button
                     onClick={() => submitQuizAnswer("give me the answer please and show full solution", "solution")}
                     disabled={loading}
-                    className="bg-amber-500/10 hover:bg-amber-500/10 border border-amber-500/40 px-3 py-1.5 rounded-full text-amber-800 whitespace-nowrap transition flex items-center gap-1 font-semibold"
+                    className="bg-ember-500/15 hover:bg-ember-500/25 border border-ember-500/40 px-3.5 py-1.5 rounded-full text-ember-300 whitespace-nowrap transition flex items-center gap-1 font-semibold"
                   >
                     ⚡ Unlock Full Solution
                   </button>
@@ -1564,12 +1564,12 @@ export default function App() {
                     onKeyDown={(e) => e.key === 'Enter' && submitQuizAnswer()} 
                     placeholder="Type your question or answer here..." 
                     disabled={loading}
-                    className="flex-1 bg-sand-950 border border-sand-800 rounded-xl px-4 py-3 text-xs text-sand-100 focus:outline-none focus:border-olive-500 transition font-mono placeholder:text-sand-600"
+                    className="flex-1 bg-sand-950 border border-sand-800 rounded-xl px-4 py-3 text-sm sm:text-base text-sand-100 focus:outline-none focus:border-olive-500 transition font-mono placeholder:text-sand-600"
                   />
                   <button 
                     onClick={() => submitQuizAnswer()} 
                     disabled={loading || !studentAnswer.trim()}
-                    className="bg-gradient-to-r from-olive-600 to-amber-600 hover:from-olive-500 hover:to-amber-500 text-white font-bold px-6 rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-sand-300/25 transition disabled:opacity-40 flex items-center gap-2"
+                    className="bg-gradient-to-r from-olive-600 via-ember-600 to-clay-600 hover:from-olive-500 hover:to-clay-500 text-white font-bold px-6 rounded-xl text-xs sm:text-sm uppercase tracking-wider shadow-lg shadow-sand-300/25 transition disabled:opacity-40 flex items-center gap-2"
                   >
                     {loading ? (
                       <div className="w-4 h-4 border-2 border-white/35 border-t-white rounded-full animate-spin" />
@@ -1604,8 +1604,8 @@ export default function App() {
                           <Bookmark className="w-4 h-4" />
                         </div>
                         <div>
-                          <h3 className="text-sm font-bold text-sand-50">Threshold Final Evaluation</h3>
-                          <span className="text-[11px] text-clay-400 font-mono font-semibold">
+                          <h3 className="text-base sm:text-lg font-bold text-sand-50">Threshold Final Evaluation</h3>
+                          <span className="text-xs text-clay-400 font-mono font-semibold">
                             {finalExams[activeExamQuestionIndex]?.moduleOrigin}
                           </span>
                         </div>
@@ -1622,7 +1622,7 @@ export default function App() {
 
                     {/* Question Statement */}
                     <div className="bg-sand-950 p-6 rounded-2xl border border-sand-850 space-y-4">
-                      <p className="text-sm font-semibold leading-relaxed text-sand-100">
+                      <p className="text-base sm:text-lg font-semibold leading-relaxed text-sand-50">
                         {finalExams[activeExamQuestionIndex]?.text}
                       </p>
                       
@@ -1634,7 +1634,7 @@ export default function App() {
                         onChange={(e) => setExamTextInputs(p => ({ ...p, [finalExams[activeExamQuestionIndex].qId]: e.target.value }))} 
                         disabled={lastQuestionEvaluated || loading} 
                         placeholder="Type your final answer here..." 
-                        className="w-full bg-sand-900 border border-sand-800 rounded-xl px-4 py-3 text-xs text-sand-200 focus:outline-none focus:border-clay-500 transition font-mono"
+                        className="w-full bg-sand-900 border border-sand-800 rounded-xl px-4 py-3 text-sm sm:text-base text-sand-100 focus:outline-none focus:border-clay-500 transition font-mono"
                       />
                     </div>
 
@@ -1643,13 +1643,13 @@ export default function App() {
                       <div className="flex justify-between items-center flex-wrap gap-2">
                         <div>
                           {lastQuestionEvaluated && !isQuestionPassed && (
-                            <span className="text-xs font-mono text-clay-400 flex items-center gap-1.5">
+                            <span className="text-xs sm:text-sm font-mono text-clay-400 flex items-center gap-1.5 font-semibold">
                               <AlertCircle className="w-4 h-4 text-clay-500 shrink-0" />
                               Incorrect. Click Retake or view hint below to retry.
                             </span>
                           )}
                           {lastQuestionEvaluated && isQuestionPassed && (
-                            <span className="text-xs font-mono text-olive-400 flex items-center gap-1.5">
+                            <span className="text-xs sm:text-sm font-mono text-olive-400 flex items-center gap-1.5 font-semibold">
                               <CheckCircle2 className="w-4 h-4 text-olive-500 shrink-0" />
                               Correct answer verified!
                             </span>
@@ -1663,16 +1663,16 @@ export default function App() {
                                 setShowSideHintBox(!showSideHintBox);
                                 if (!showSideHintBox) setHintsUsedCount(prev => prev + 1);
                               }}
-                              className="bg-amber-600/10 hover:bg-amber-600/20 border border-amber-500/30 text-amber-800 px-4 py-2.5 rounded-xl text-xs font-bold uppercase transition flex items-center gap-1.5"
+                              className="bg-ember-600/10 hover:bg-ember-600/20 border border-ember-500/30 text-ember-300 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold uppercase transition flex items-center gap-1.5"
                             >
-                              <Sparkles className="w-3.5 h-3.5 text-amber-800" />
+                              <Sparkles className="w-3.5 h-3.5 text-ember-300" />
                               <span>{showSideHintBox ? 'Hide Socratic Hint' : 'Socratic Hint'}</span>
                             </button>
                           )}
                           {lastQuestionEvaluated && !isQuestionPassed && (
                             <button 
                               onClick={triggerRetakeAttemptLoop} 
-                              className="bg-amber-600/20 border border-amber-500/30 text-amber-800 px-5 py-2.5 rounded-xl text-xs font-bold uppercase transition"
+                              className="bg-ember-600/20 hover:bg-ember-600/30 border border-ember-500/40 text-ember-300 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold uppercase transition"
                             >
                               Retake Question
                             </button>
@@ -1680,7 +1680,7 @@ export default function App() {
                           {lastQuestionEvaluated ? (
                             <button 
                               onClick={forceAdvanceNextItem} 
-                              className="bg-clay-600 hover:bg-clay-500 text-white px-6 py-2.5 rounded-xl text-xs font-bold uppercase transition flex items-center gap-1.5 shadow-lg shadow-sand-300/25"
+                              className="bg-clay-600 hover:bg-clay-500 text-white px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold uppercase transition flex items-center gap-1.5 shadow-lg shadow-sand-300/25"
                             >
                               <span>Next Question</span>
                               <ChevronRight className="w-4 h-4" />
@@ -1689,7 +1689,7 @@ export default function App() {
                             <button 
                               onClick={handleShortAnswerEvaluation} 
                               disabled={loading || !(examTextInputs[finalExams[activeExamQuestionIndex].qId] || "").trim()} 
-                              className="bg-gradient-to-r from-ember-600 to-clay-600 hover:from-ember-500 hover:to-clay-500 text-white font-bold px-6 py-2.5 rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-sand-300/25 transition disabled:opacity-40"
+                              className="bg-gradient-to-r from-ember-600 to-clay-600 hover:from-ember-500 hover:to-clay-500 text-white font-bold px-6 py-2.5 rounded-xl text-xs sm:text-sm uppercase tracking-wider shadow-lg shadow-sand-300/25 transition disabled:opacity-40"
                             >
                               Verify & Submit Item
                             </button>
@@ -1699,20 +1699,20 @@ export default function App() {
 
                       {/* Expandable Socratic Hint & Diagnosis Box */}
                       {showSideHintBox && serverEvaluatedHint && (
-                        <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-2xl text-xs space-y-3 animate-fadeIn">
-                          <div className="flex items-center gap-2 border-b border-amber-600/25 pb-2">
-                            <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                            <span className="text-[10px] font-mono tracking-widest text-amber-800 font-bold uppercase">
+                        <div className="bg-sand-950/80 border border-ember-500/30 p-5 rounded-2xl text-xs space-y-3.5 animate-fadeIn shadow-japandi-sm">
+                          <div className="flex items-center gap-2 border-b border-sand-800 pb-2.5">
+                            <div className="w-2.5 h-2.5 rounded-full bg-ember-500 animate-pulse" />
+                            <span className="text-xs sm:text-sm font-mono tracking-widest text-ember-300 font-bold uppercase">
                               Mamdani Socratic Hint & Diagnostic Analysis
                             </span>
                           </div>
                           {mamdaniGapAnalysis && (
-                            <p className="text-[11px] text-amber-800 font-mono bg-amber-500/10 p-2.5 rounded-xl border border-amber-600/25 leading-snug">
-                              <strong className="text-amber-800">Diagnosis:</strong> {mamdaniGapAnalysis}
+                            <p className="text-xs sm:text-sm text-sand-100 font-mono bg-ember-500/10 p-3 rounded-xl border border-ember-500/25 leading-relaxed">
+                              <strong className="text-ember-300">Diagnosis:</strong> {mamdaniGapAnalysis}
                             </p>
                           )}
-                          <div className="border-t border-amber-600/25 pt-2">
-                            <HintMarkdown text={serverEvaluatedHint} className="text-sand-200 text-xs" />
+                          <div className="border-t border-sand-800 pt-2.5">
+                            <HintMarkdown text={serverEvaluatedHint} className="text-sand-100 text-sm sm:text-base leading-relaxed" />
                           </div>
                         </div>
                       )}
@@ -1821,7 +1821,7 @@ export default function App() {
                     <span>{telemetry.activeNode || 'Idle'}</span>
                   </div>
                   <div className="text-[11px] text-sand-400 font-mono">
-                    Remedial Routing Active: <span className={telemetry.remedialPathActive ? 'text-amber-800' : 'text-olive-400'}>{String(telemetry.remedialPathActive)}</span>
+                    Remedial Routing Active: <span className={telemetry.remedialPathActive ? 'text-ember-300 font-bold' : 'text-olive-400'}>{String(telemetry.remedialPathActive)}</span>
                   </div>
                 </div>
 
@@ -1830,7 +1830,7 @@ export default function App() {
                   <div className="text-[9px] font-mono uppercase tracking-widest text-sand-500 font-bold">
                     Defuzzified Centroid Score
                   </div>
-                  <div className="text-3xl font-black bg-gradient-to-r from-olive-400 via-amber-300 to-amber-400 bg-clip-text text-transparent">
+                  <div className="text-3xl font-black bg-gradient-to-r from-olive-400 via-ember-300 to-ember-400 bg-clip-text text-transparent">
                     {mamdaniDefuzzifiedScore !== null ? `${mamdaniDefuzzifiedScore}%` : (mamdaniFuzzyScore !== null ? `${mamdaniFuzzyScore}%` : '---')}
                   </div>
                   {mamdaniFuzzyScore !== null && mamdaniDefuzzifiedScore !== null && mamdaniFuzzyScore !== mamdaniDefuzzifiedScore && (
@@ -1843,7 +1843,7 @@ export default function App() {
                     <span className={`text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full border ${
                       mamdaniTier === 'High Mastery'      ? 'bg-olive-500/20 text-olive-300 border-olive-500/40 shadow-[0_0_10px_rgba(174,189,94,0.25)]' :
                       mamdaniTier === 'Moderate Mastery'  ? 'bg-ember-500/20 text-ember-300 border-ember-500/40 shadow-[0_0_10px_rgba(233,146,79,0.25)]' :
-                      mamdaniTier === 'Developing'        ? 'bg-yellow-500/20 text-yellow-800 border-yellow-500/40 shadow-[0_0_10px_rgba(234,179,8,0.2)]' :
+                      mamdaniTier === 'Developing'        ? 'bg-ember-500/20 text-ember-300 border-ember-500/40 shadow-[0_0_10px_rgba(233,146,79,0.2)]' :
                       mamdaniTier === 'Intervention Required' ? 'bg-clay-500/20 text-clay-300 border-clay-500/40 shadow-[0_0_10px_rgba(217,138,133,0.25)]' :
                       'bg-sand-900 text-sand-500 border-sand-800'
                     }`}>
@@ -1889,7 +1889,7 @@ export default function App() {
                     </div>
                     <div className="w-full h-1.5 bg-sand-900 rounded-full overflow-hidden">
                       <div 
-                        className="h-full bg-gradient-to-r from-amber-500 to-olive-400 transition-all duration-500"
+                        className="h-full bg-gradient-to-r from-ember-500 to-olive-400 transition-all duration-500"
                         style={{ width: `${mamdaniMetrics ? Math.max(5, mamdaniMetrics.accuracy_pct) : 0}%` }}
                       />
                     </div>
@@ -1908,7 +1908,7 @@ export default function App() {
                     </div>
                     <div className="w-full h-1.5 bg-sand-900 rounded-full overflow-hidden">
                       <div 
-                        className={`h-full transition-all duration-500 ${questionTimer <= 60 ? 'bg-ember-400' : 'bg-amber-500'}`}
+                        className={`h-full transition-all duration-500 ${questionTimer <= 60 ? 'bg-ember-400' : 'bg-clay-500'}`}
                         style={{ width: `${Math.min(100, (questionTimer / 120) * 100)}%` }}
                       />
                     </div>
@@ -1940,13 +1940,13 @@ export default function App() {
                         <AlertCircle className="w-3 h-3 text-clay-400" />
                         Error Severity (μ_sev)
                       </span>
-                      <span className={`font-bold ${mamdaniErrorSeverity > 0.6 ? 'text-clay-400' : (mamdaniErrorSeverity > 0.2 ? 'text-amber-800' : 'text-olive-400')}`}>
+                      <span className={`font-bold ${mamdaniErrorSeverity > 0.6 ? 'text-clay-400' : (mamdaniErrorSeverity > 0.2 ? 'text-ember-300' : 'text-olive-400')}`}>
                         {mamdaniErrorSeverity > 0.6 ? 'Critical Flaw' : (mamdaniErrorSeverity > 0.2 ? 'Procedural Gap' : 'Minor Slip')} ({(mamdaniErrorSeverity * 100).toFixed(0)}%)
                       </span>
                     </div>
                     <div className="w-full h-1.5 bg-sand-900 rounded-full overflow-hidden">
                       <div 
-                        className={`h-full transition-all duration-500 ${mamdaniErrorSeverity > 0.6 ? 'bg-clay-500' : (mamdaniErrorSeverity > 0.2 ? 'bg-amber-500' : 'bg-olive-500')}`}
+                        className={`h-full transition-all duration-500 ${mamdaniErrorSeverity > 0.6 ? 'bg-clay-500' : (mamdaniErrorSeverity > 0.2 ? 'bg-ember-500' : 'bg-olive-500')}`}
                         style={{ width: `${Math.max(5, mamdaniErrorSeverity * 100)}%` }}
                       />
                     </div>
@@ -1956,16 +1956,16 @@ export default function App() {
                   <div className="bg-sand-900/60 border border-sand-800/80 p-2.5 rounded-xl space-y-1">
                     <div className="flex justify-between text-[10px] font-mono">
                       <span className="text-sand-400 flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-amber-800" />
+                        <Sparkles className="w-3 h-3 text-ember-400" />
                         Scaffolding (μ_hnt)
                       </span>
-                      <span className="text-amber-800 font-bold">
+                      <span className="text-ember-300 font-bold">
                         {hintsUsedCount === 0 ? 'Autonomous (0)' : `Assisted (${hintsUsedCount} hints)`}
                       </span>
                     </div>
                     <div className="w-full h-1.5 bg-sand-900 rounded-full overflow-hidden">
                       <div 
-                        className="h-full bg-amber-400 transition-all duration-500"
+                        className="h-full bg-ember-500 transition-all duration-500"
                         style={{ width: `${Math.min(100, hintsUsedCount * 50)}%` }}
                       />
                     </div>
@@ -2098,7 +2098,7 @@ export default function App() {
                       <th className="py-2.5 px-2">Error Severity (E)</th>
                       <th className="py-2.5 px-2">Hints (H)</th>
                       <th className="py-2.5 px-2">Fired Rules</th>
-                      <th className="py-2.5 px-2 text-amber-800">Defuzzified Centroid</th>
+                      <th className="py-2.5 px-2 text-ember-300">Defuzzified Centroid</th>
                       <th className="py-2.5 px-2 text-olive-400">Final Calibrated</th>
                       <th className="py-2.5 px-2">Tier</th>
                       <th className="py-2.5 px-2 text-center">Live Test</th>
@@ -2115,13 +2115,13 @@ export default function App() {
                         <td className="py-2.5 px-2 text-sand-300">{sc.attempts}</td>
                         <td className="py-2.5 px-2 text-sand-300">{sc.severityLabel}</td>
                         <td className="py-2.5 px-2 text-sand-300">{sc.hints}</td>
-                        <td className="py-2.5 px-2 text-amber-800 text-[10px] font-semibold">{sc.firedRules}</td>
-                        <td className="py-2.5 px-2 font-black text-amber-800">{sc.centroid.toFixed(2)}%</td>
+                        <td className="py-2.5 px-2 text-ember-300 text-[10px] font-semibold">{sc.firedRules}</td>
+                        <td className="py-2.5 px-2 font-black text-ember-300">{sc.centroid.toFixed(2)}%</td>
                         <td className="py-2.5 px-2 font-black text-olive-400">{sc.finalScore.toFixed(2)}%</td>
                         <td className="py-2.5 px-2">
                           <span className={`text-[9px] px-2 py-0.5 rounded border font-semibold ${
                             sc.tier === 'High Mastery' ? 'bg-olive-500/10 text-olive-400 border-olive-500/30' :
-                            sc.tier === 'Developing' ? 'bg-yellow-500/10 text-yellow-800 border-yellow-500/30' :
+                            sc.tier === 'Developing' ? 'bg-ember-500/10 text-ember-300 border-ember-500/30' :
                             'bg-clay-500/10 text-clay-400 border-clay-500/30'
                           }`}>
                             {sc.tier}

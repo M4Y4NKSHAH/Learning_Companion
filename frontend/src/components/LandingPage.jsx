@@ -204,7 +204,7 @@ export default function LandingPage({ onSignUp, onNavigateSubject, onNavigateTie
               {onOpenIngestion && (
                 <button 
                   onClick={onOpenIngestion}
-                  className="bg-gradient-to-r from-clay-600 to-amber-600 hover:from-clay-500 hover:to-amber-500 text-white font-bold text-sm px-5 py-3 rounded-xl shadow-lg shadow-sand-300/25 transition-all flex items-center gap-2"
+                  className="bg-gradient-to-r from-clay-600 via-ember-600 to-olive-600 hover:from-clay-500 hover:to-olive-500 text-white font-bold text-sm px-5 py-3 rounded-xl shadow-lg shadow-sand-300/25 transition-all flex items-center gap-2"
                 >
                   <Sparkles className="w-4 h-4" /> Ingest Your Notes & Tests
                 </button>
@@ -488,7 +488,7 @@ export default function LandingPage({ onSignUp, onNavigateSubject, onNavigateTie
               </div>
 
               {modalError && (
-                <p className="text-xs text-amber-800 bg-amber-500/10 border border-amber-500/40 rounded-lg px-3 py-2">
+                <p className="text-xs text-clay-300 bg-clay-500/15 border border-clay-500/40 rounded-lg px-3 py-2">
                   {modalError}
                 </p>
               )}

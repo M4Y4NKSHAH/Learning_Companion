@@ -98,6 +98,7 @@ class HeadingSpot:
 @dataclass
 class StructurePlan:
     """The inferred skeleton of a book — everything the divider needs."""
+    source: str = "inferred_headings"
     chapter_kind: str = "none"
     chapter_matches: List[HeadingSpot] = field(default_factory=list)
     section_kind: str = "chunk"
@@ -110,6 +111,7 @@ class StructurePlan:
     confidence: float = 0.0
     running_forms: Set[str] = field(default_factory=set)
     notes: List[str] = field(default_factory=list)
+    parsed_chapters: List[Dict[str, Any]] = field(default_factory=list)
 
     # ---------------------------------------------------------------- #
     def is_running_line(self, line: str) -> bool:
@@ -134,6 +136,7 @@ class StructurePlan:
         units = (f"{len(self.units)} units via '{self.unit_kind}'" if self.units
                  else "units: automatic balanced buckets")
         lines = [
+            f"outline source  : {self.source}",
             f"chapter pattern : {ch}",
             f"section pattern : {sec}",
             f"unit strategy   : {units}",
@@ -179,8 +182,11 @@ def _chapter_candidates() -> List[Tuple[str, re.Pattern, str, bool]]:
          re.compile(r"(?im)^[ \t]*(?:LESSON|LECTURE|TOPIC|WEEK|SESSION|CLASS|DAY)[ \t]+(\d{1,3})\b" + sep + r"(.*)$"),
          "digits", False),
         ("hash_headings",
-         re.compile(r"(?m)^(#{1,4})[ \t]*(.+?)[ \t]*#*[ \t]*$"),
+         re.compile(r"(?m)^(#{1,4})[ \t]+(.+?)[ \t]*#*[ \t]*$"),
          "hash", False),
+        ("bare_num_title",
+         re.compile(r"(?m)^[ \t]*(\d{1,3})[ \t]*\n[ \t]*([A-Z][A-Za-z0-9 ,'&\-–—:]{2,70})[ \t]*$"),
+         "digits", False),
         ("numbered_dot",
          re.compile(r"(?m)^[ \t]*(\d{1,3})\.[ \t]+([A-Z][^.\n]{2,80})$"),
          "digits", False),
@@ -242,45 +248,401 @@ class BookStructurer:
     MIN_CHAPTERS = 3
     MAX_CHAPTERS = 120
 
-    def __init__(self, text: str, hints: Optional[Dict[str, Any]] = None):
+    def __init__(self, text: str = "", hints: Optional[Dict[str, Any]] = None,
+                 outline: Optional[List[Any]] = None,
+                 extracted_book: Optional[Any] = None):
         self.text = text or ""
         self.hints = hints or {}
         self.notes: List[str] = []
+        self.outline = outline or (self.hints.get("outline") if self.hints else None)
+        self.extracted_book = extracted_book or (self.hints.get("extracted_book") if self.hints else None)
+        if self.extracted_book is not None:
+            if not self.outline:
+                self.outline = getattr(self.extracted_book, "outline", None)
+            if not self.text:
+                self.text = getattr(self.extracted_book, "text", "")
 
     # ------------------------------------------------------------------ #
-    # Orchestration
+    # Orchestration — Outline Ladder
     # ------------------------------------------------------------------ #
     def plan(self) -> StructurePlan:
-        plan = StructurePlan()
-        if len(self.text.strip()) < 500:
+        """
+        Infers the book's structure through a prioritized outline ladder:
+          1. embedded_outline: use when outline has >= 3 top-level chapter entries & monotonic pages
+          2. printed_toc: front-matter TOC parser
+          3. inferred_headings: pattern scoring across document body
+          4. balanced_chunks: last resort size-balanced fallback
+        Never fails: if a rung fails, falls through to the next.
+        """
+        if len(self.text.strip()) < 500 and not self.outline:
+            plan = StructurePlan()
+            plan.source = "balanced_chunks"
             plan.notes.append("document too short for structural inference")
             return plan
 
-        plan.toc_detected = self._toc_region_end() is not None
+        # Rung 1: Embedded Outline
+        try:
+            plan = self._plan_from_embedded_outline()
+            if plan is not None:
+                plan.source = "embedded_outline"
+                return plan
+        except Exception as e:
+            self.notes.append(f"Rung 1 (embedded_outline) failed: {e}")
 
+        # Rung 2: Printed TOC
+        try:
+            plan = self._plan_from_printed_toc()
+            if plan is not None:
+                plan.source = "printed_toc"
+                return plan
+        except Exception as e:
+            self.notes.append(f"Rung 2 (printed_toc) failed: {e}")
+
+        # Rung 3: Inferred Headings
+        try:
+            plan = self._plan_from_inferred_headings()
+            if plan is not None:
+                plan.source = "inferred_headings"
+                return plan
+        except Exception as e:
+            self.notes.append(f"Rung 3 (inferred_headings) failed: {e}")
+
+        # Rung 4: Balanced Chunks (last resort)
+        plan = self._plan_from_balanced_chunks()
+        plan.source = "balanced_chunks"
+        return plan
+
+    def _normalize_outline(self) -> List[Tuple[int, str, int]]:
+        norm: List[Tuple[int, str, int]] = []
+        for item in (self.outline or []):
+            if hasattr(item, "level") and hasattr(item, "title") and hasattr(item, "page"):
+                norm.append((int(item.level), str(item.title).strip(), int(item.page)))
+            elif isinstance(item, (list, tuple)) and len(item) >= 3:
+                norm.append((int(item[0]), str(item[1]).strip(), int(item[2])))
+        return norm
+
+    def _plan_from_embedded_outline(self) -> Optional[StructurePlan]:
+        entries = self._normalize_outline()
+        if not entries or len(entries) < self.MIN_CHAPTERS:
+            return None
+
+        frontmatter_re = re.compile(
+            r"^(?:contents|table of contents|preface|foreword|about\s+|acknowledg|title page|copyright)\b",
+            re.IGNORECASE
+        )
+        backmatter_re = re.compile(
+            r"^(?:appendix|index|glossary|bibliography|references|solutions|answers|credits|errata|colophon)\b",
+            re.IGNORECASE
+        )
+        chapter_re = re.compile(
+            r"^(?:chapter|unit|part|module|lesson)\s+(\d+|[ivxlcdm]+)\b[:\s-]*(.*)$",
+            re.IGNORECASE
+        )
+        numdot_re = re.compile(r"^(\d{1,3})\b[:\s.\-–—]+(.*)$")
+
+        levels_present = sorted({e[0] for e in entries if e[2] > 0})
+        if not levels_present:
+            return None
+
+        chosen_level = None
+        candidate_chapters: List[Dict[str, Any]] = []
+
+        # Try candidate levels: Level 1 (standard) or Level 2 (when Level 1 represents Parts/Units)
+        for lvl_choice in levels_present[:2]:
+            curr_candidates: List[Dict[str, Any]] = []
+            level_entries = [(idx, e) for idx, e in enumerate(entries) if e[0] == lvl_choice and e[2] > 0]
+
+            for idx, (orig_idx, (lvl, title, page)) in enumerate(level_entries):
+                clean_title = title.strip()
+                if frontmatter_re.search(clean_title):
+                    continue
+                if backmatter_re.search(clean_title):
+                    continue
+
+                m_ch = chapter_re.match(clean_title)
+                m_num = numdot_re.match(clean_title)
+                if m_ch:
+                    raw_num = m_ch.group(1)
+                    num = int(raw_num) if raw_num.isdigit() else roman_to_int(raw_num) or (len(curr_candidates) + 1)
+                    t = m_ch.group(2).strip() or clean_title
+                elif m_num:
+                    num = int(m_num.group(1))
+                    t = m_num.group(2).strip() or clean_title
+                else:
+                    num = len(curr_candidates) + 1
+                    t = clean_title
+
+                curr_candidates.append({
+                    "chapter": num,
+                    "title": t,
+                    "pdf_page_start": page,
+                    "chapter_review_pdf_page": None,
+                    "sections": [],
+                    "orig_idx": orig_idx,
+                })
+
+            if len(curr_candidates) < self.MIN_CHAPTERS:
+                continue
+
+            pages = [c["pdf_page_start"] for c in curr_candidates]
+            if not all(p2 >= p1 for p1, p2 in zip(pages, pages[1:])):
+                continue
+
+            chosen_level = lvl_choice
+            candidate_chapters = curr_candidates
+            break
+
+        if chosen_level is None or len(candidate_chapters) < self.MIN_CHAPTERS:
+            return None
+
+        # Extract subsections & chapter review
+        for i, cand in enumerate(candidate_chapters):
+            start_idx = cand["orig_idx"] + 1
+            end_idx = candidate_chapters[i + 1]["orig_idx"] if i + 1 < len(candidate_chapters) else len(entries)
+            for lvl, child_title, child_page in entries[start_idx:end_idx]:
+                if lvl <= chosen_level:
+                    break
+                s_title = child_title.strip()
+                if re.match(r"^chapter\s+review\b", s_title, re.IGNORECASE):
+                    cand["chapter_review_pdf_page"] = child_page
+                    continue
+                sec_m = re.match(r"^(\d+\.\d+)\b[:\s\-–—]*(.*)$", s_title)
+                if sec_m:
+                    label = sec_m.group(1)
+                    st = sec_m.group(2).strip() or s_title
+                    cand["sections"].append({
+                        "label": label,
+                        "title": st,
+                        "pdf_page_start": child_page,
+                    })
+                elif lvl == chosen_level + 1 and not any(bp in s_title.lower() for bp in ("chapter outline", "introduction", "summary", "key terms")):
+                    cand["sections"].append({
+                        "label": f"{cand['chapter']}.{len(cand['sections']) + 1}",
+                        "title": s_title,
+                        "pdf_page_start": child_page,
+                    })
+
+        # Approximate words calculation if page texts are available
+        if self.extracted_book and hasattr(self.extracted_book, "pages") and self.extracted_book.pages:
+            pages_dict = {p.page_index: p.text for p in self.extracted_book.pages}
+            total_doc_pages = len(self.extracted_book.pages)
+            for i, cand in enumerate(candidate_chapters):
+                secs = cand["sections"]
+                for s_i, sec in enumerate(secs):
+                    p_start = sec["pdf_page_start"]
+                    if s_i + 1 < len(secs):
+                        p_end = secs[s_i + 1]["pdf_page_start"]
+                    elif cand["chapter_review_pdf_page"]:
+                        p_end = cand["chapter_review_pdf_page"]
+                    elif i + 1 < len(candidate_chapters):
+                        p_end = candidate_chapters[i + 1]["pdf_page_start"]
+                    else:
+                        p_end = total_doc_pages + 1
+                    sec_words = 0
+                    for pg in range(p_start, max(p_start + 1, min(p_end, total_doc_pages + 1))):
+                        txt = pages_dict.get(pg, "")
+                        sec_words += len(txt.split())
+                    sec["approx_words"] = sec_words
+
+        plan = StructurePlan()
+        plan.source = "embedded_outline"
+        plan.chapter_kind = "embedded_outline"
+        plan.confidence = 0.99
+        plan.parsed_chapters = candidate_chapters
+        plan.toc_detected = True
+        plan.toc_count = len(entries)
+        plan.section_kind = "numdot" if any("." in s["label"] for c in candidate_chapters for s in c["sections"]) else "chunk"
+
+        # Build Units if outline had parts at a higher level
+        if chosen_level > min(levels_present):
+            parent_entries = [e for e in entries if e[0] < chosen_level and e[2] > 0]
+            units: List[Dict[str, Any]] = []
+            for u_idx, (p_lvl, p_title, p_page) in enumerate(parent_entries, 1):
+                clean_p = re.sub(r"^(?:unit|part|module)\s+\d+[:\s-]*", "", p_title, flags=re.I).strip()
+                ch_in_unit = [c["chapter"] for c in candidate_chapters if c["pdf_page_start"] >= p_page]
+                if u_idx < len(parent_entries):
+                    next_p_page = parent_entries[u_idx][2]
+                    ch_in_unit = [c["chapter"] for c in candidate_chapters if p_page <= c["pdf_page_start"] < next_p_page]
+                if ch_in_unit:
+                    units.append({
+                        "unit": u_idx,
+                        "name": clean_p or p_title,
+                        "chapters": ch_in_unit,
+                    })
+            if units:
+                plan.units = units
+                plan.unit_kind = "outline_hierarchy"
+
+        # Build HeadingSpots
+        page_offsets: Dict[int, int] = {}
+        if self.extracted_book and hasattr(self.extracted_book, "pages") and self.extracted_book.pages:
+            cur_pos = 0
+            for p in self.extracted_book.pages:
+                page_offsets[p.page_index] = cur_pos
+                cur_pos += len(p.text) + 2
+
+        toc_end = self._toc_region_end() or 0
+        for cand in candidate_chapters:
+            pos = page_offsets.get(cand["pdf_page_start"])
+            if pos is None:
+                found = self.text.find(cand["title"], toc_end)
+                if found == -1:
+                    found = self.text.find(cand["title"])
+                pos = found if found != -1 else 0
+            spot = HeadingSpot(
+                pos=pos,
+                number=cand["chapter"],
+                title=cand["title"],
+                line=f"Chapter {cand['chapter']}: {cand['title']}",
+                level=1,
+            )
+            plan.chapter_matches.append(spot)
+
+        plan.body_start = plan.chapter_matches[0].pos if plan.chapter_matches else 0
+        plan.running_forms = self._detect_running_forms()
+        if self.extracted_book and hasattr(self.extracted_book, "running_headers") and self.extracted_book.running_headers:
+            plan.running_forms.update(self.extracted_book.running_headers)
+        plan.notes.append(
+            f"Rung 1 (embedded_outline): extracted {len(candidate_chapters)} chapters, "
+            f"{sum(len(c['sections']) for c in candidate_chapters)} sections"
+        )
+        return plan
+
+    def _plan_from_printed_toc(self) -> Optional[StructurePlan]:
+        contents_m = re.search(r"(?im)^[ \t]*(?:table of )?contents\b", self.text[:max(10000, int(len(self.text) * 0.35))])
+        if not contents_m:
+            return None
+
+        # Look for chapter_digits in running body text
+        cand_patterns = _chapter_candidates()
+        spots = self._spots_from_regex(cand_patterns[0][1], "digits")
+        if not spots:
+            return None
+        body_spots = self._strip_front_matter_duplicates(spots)
+        if len(body_spots) < self.MIN_CHAPTERS:
+            return None
+
+        body_start = self._find_body_start(body_spots, "chapter_digits")
+        front = self.text[contents_m.start():body_start]
+
+        chapter_mark_re = re.compile(r"^[ \t]*CHAPTER\s+(\d{1,3})\s*$", re.IGNORECASE)
+        section_re = re.compile(r"^[ \t]*(\d{1,3})\.(\d{1,3})\s+(.+)$")
+
+        parsed: List[Dict[str, Any]] = []
+        current: Optional[Dict[str, Any]] = None
+        title_parts: List[str] = []
+        awaiting_title = False
+
+        def _finalize():
+            nonlocal awaiting_title
+            if current is not None and title_parts:
+                current["title"] = re.sub(r"\s{2,}", " ", " ".join(title_parts)).strip()
+            title_parts.clear()
+            awaiting_title = False
+
+        for raw in front.split("\n"):
+            line = raw.strip().replace("\u00f2", " ").strip()
+            if not line:
+                continue
+            cm = chapter_mark_re.match(line)
+            if cm:
+                _finalize()
+                current = {"chapter": int(cm.group(1)), "title": "", "sections": [], "page": None}
+                parsed.append(current)
+                awaiting_title = True
+                continue
+            if current is None:
+                continue
+            sm = section_re.match(line)
+            if sm and int(sm.group(1)) == current["chapter"]:
+                _finalize()
+                t = re.sub(r"\s+\d{1,4}\s*$", "", sm.group(3)).strip()
+                current["sections"].append({"label": f"{sm.group(1)}.{sm.group(2)}", "title": t})
+                continue
+            if awaiting_title and re.search(r"[A-Za-z]{3,}", line):
+                pg = re.search(r"\s+(\d{1,4})\s*$", line)
+                title_parts.append(re.sub(r"\s+\d{1,4}\s*$", "", line).strip())
+                if pg:
+                    current["page"] = int(pg.group(1))
+                    _finalize()
+                continue
+        _finalize()
+
+        valid_chapters = [c for c in parsed if c.get("title") and (c.get("sections") or c.get("page"))]
+        if len(valid_chapters) < self.MIN_CHAPTERS:
+            return None
+
+        pages = [c["page"] for c in valid_chapters if c.get("page") is not None]
+        if len(pages) >= self.MIN_CHAPTERS and not all(p2 >= p1 for p1, p2 in zip(pages, pages[1:])):
+            return None
+
+        # Verify body spots correspond to chapters in TOC
+        toc_ch_nums = {c["chapter"] for c in valid_chapters}
+        matched_body_spots = [s for s in body_spots if s.number in toc_ch_nums]
+        if len(matched_body_spots) < self.MIN_CHAPTERS:
+            matched_body_spots = body_spots
+
+        # Attach titles to body spots if missing
+        ch_title_map = {c["chapter"]: c["title"] for c in valid_chapters}
+        for spot in matched_body_spots:
+            if not spot.title or spot.title.isdigit():
+                spot.title = ch_title_map.get(spot.number) or self.title_after(spot.pos)
+
+        plan = StructurePlan()
+        plan.source = "printed_toc"
+        plan.chapter_kind = "chapter_digits"
+        plan.chapter_matches = sorted(matched_body_spots, key=lambda s: s.pos)
+        plan.parsed_chapters = valid_chapters
+        plan.toc_detected = True
+        plan.toc_count = sum(len(c["sections"]) + 1 for c in valid_chapters)
+        plan.confidence = 0.95
+        plan.body_start = plan.chapter_matches[0].pos if plan.chapter_matches else body_start
+        self._detect_sections(plan)
+        self._detect_units(plan)
+        plan.running_forms = self._detect_running_forms()
+        plan.notes.append(
+            f"Rung 2 (printed_toc): parsed {len(valid_chapters)} chapters, "
+            f"{sum(len(c['sections']) for c in valid_chapters)} sections from front-matter TOC"
+        )
+        return plan
+
+    def _plan_from_inferred_headings(self) -> Optional[StructurePlan]:
         scored = self._scan_chapters()
-        if scored:
-            best = max(scored, key=lambda c: c["score"])
-            plan.chapter_kind = best["kind"]
-            plan.chapter_matches = best["spots"]
-            plan.confidence = round(best["score"], 3)
-            plan.notes.append(
-                f"'{best['kind']}' scored {best['score']:.2f} "
-                f"(sequence {best['seq']:.2f}, spread {best['spread']:.2f}, "
-                f"heading-quality {best['quality']:.2f}, n={len(best['spots'])})")
-            for spot in plan.chapter_matches:
-                if not spot.title:
-                    spot.title = self.title_after(spot.pos)
-        else:
-            plan.chapter_kind = "none"
-            plan.chapter_matches = self._size_balanced_spots(self.text)
-            plan.notes.append("no chapter-like headings found -> size-balanced division")
-            plan.confidence = 0.2
-
+        if not scored:
+            return None
+        best = max(scored, key=lambda c: c["score"])
+        plan = StructurePlan()
+        plan.source = "inferred_headings"
+        plan.toc_detected = self._toc_region_end() is not None
+        plan.chapter_kind = best["kind"]
+        plan.chapter_matches = best["spots"]
+        plan.confidence = round(best["score"], 3)
+        plan.notes.append(
+            f"'{best['kind']}' scored {best['score']:.2f} "
+            f"(sequence {best['seq']:.2f}, spread {best['spread']:.2f}, "
+            f"heading-quality {best['quality']:.2f}, n={len(best['spots'])})")
+        for spot in plan.chapter_matches:
+            if not spot.title:
+                spot.title = self.title_after(spot.pos)
         plan.body_start = self._find_body_start(plan.chapter_matches, plan.chapter_kind)
         plan.toc_count = self._count_toc_entries(plan.body_start)
         self._detect_sections(plan)
         self._detect_units(plan)
+        plan.running_forms = self._detect_running_forms()
+        plan.notes.extend(self.notes)
+        return plan
+
+    def _plan_from_balanced_chunks(self) -> StructurePlan:
+        plan = StructurePlan()
+        plan.source = "balanced_chunks"
+        plan.chapter_kind = "none"
+        plan.chapter_matches = self._size_balanced_spots(self.text)
+        plan.notes.append("no chapter-like headings found -> size-balanced division")
+        plan.confidence = 0.2
+        plan.body_start = self._find_body_start(plan.chapter_matches, plan.chapter_kind)
+        plan.toc_count = 0
+        plan.section_kind = "chunk"
+        plan.unit_kind = "buckets"
         plan.running_forms = self._detect_running_forms()
         plan.notes.extend(self.notes)
         return plan
@@ -539,7 +901,12 @@ class BookStructurer:
                     if scored:
                         results.append(scored)
 
-        has_explicit = any(r["kind"] in ("chapter_digits", "chapter_roman", "chapter_word", "numbered_dot", "hash_headings") for r in results)
+        has_explicit = any(
+            r["kind"] in ("chapter_digits", "chapter_roman", "chapter_word", "unit_digits", "unit_roman", "lesson_digits", "numbered_dot", "hash_headings")
+            and (r.get("seq", 0) >= 0.45 or r["kind"] == "hash_headings")
+            and r.get("spread", 0) >= 0.35
+            for r in results
+        )
         if not has_explicit:
             grouped_spots = self._strip_front_matter_duplicates(self._scan_grouped_numdot())
             if grouped_spots and (self.MIN_CHAPTERS <= len(grouped_spots) <= self.MAX_CHAPTERS):
@@ -568,6 +935,16 @@ class BookStructurer:
         if len(matches) < 4:
             return []
 
+        def _is_bad_title(t: str) -> bool:
+            if not t or len(t) < 3:
+                return True
+            tl = t.lower()
+            if any(bp in tl for bp in BOILERPLATE_SUBSTRINGS):
+                return True
+            if any(w in tl for w in ("license", "cc by", "openstax", "wikimedia", "flickr", "public domain", "credit", "photo", "http", "www.")):
+                return True
+            return False
+
         by_ch: Dict[int, List[Tuple[int, str]]] = {}
         for m in matches:
             ch_num = int(m.group(1))
@@ -585,21 +962,59 @@ class BookStructurer:
         if ch_run < len(sorted_chs) * 0.4:
             return []
 
+        toc_end = self._toc_region_end() or 0
         spots: List[HeadingSpot] = []
         for ch_num in sorted_chs:
             sec_list = by_ch[ch_num]
-            body_occ = [x for x in sec_list if x[0] > 10000]
-            first_pos, first_title = body_occ[0] if (body_occ and len(sec_list) > len(body_occ)) else sec_list[0]
+            body_occ = [x for x in sec_list if x[0] >= toc_end] if toc_end else sec_list
+            first_pos, first_title = body_occ[0] if body_occ else sec_list[0]
 
             pre_text = self.text[max(0, first_pos - 800):first_pos]
+            bare_outline_m = re.search(
+                r'(?im)^[ \t]*' + str(ch_num) + r'[ \t]*\n[ \t]*([A-Z][^\n]{3,80})\s*\n(?:[^\n]*\n)*?[ \t]*chapter\s+outline\b',
+                pre_text
+            )
             parent_m = re.search(r'(?:^|\n)[ \t]*#{1,2}[ \t]+([A-Z][^\n]{3,80})\s*$', pre_text)
-            title = parent_m.group(1).strip() if parent_m else first_title
+            bare_m = re.search(r'(?:^|\n)[ \t]*' + str(ch_num) + r'[ \t]*\n[ \t]*([A-Z][^\n]{3,80})\s*$', pre_text)
+            outline_m = re.search(r'(?im)^[ \t]*chapter\s+outline\s*$', pre_text)
 
+            title = ""
+            if bare_outline_m and not _is_bad_title(bare_outline_m.group(1).strip()):
+                title = bare_outline_m.group(1).strip()
+                first_pos = max(0, first_pos - 800) + bare_outline_m.start()
+            elif parent_m and not _is_bad_title(parent_m.group(1).strip()):
+                title = parent_m.group(1).strip()
+                first_pos = max(0, first_pos - 800) + parent_m.start()
+            elif bare_m and not _is_bad_title(bare_m.group(1).strip()):
+                title = bare_m.group(1).strip()
+                first_pos = max(0, first_pos - 800) + bare_m.start()
+            elif outline_m:
+                before_outline = pre_text[:outline_m.start()]
+                lines_before = [l.strip() for l in before_outline.split("\n") if l.strip()]
+                if lines_before and len(lines_before[-1]) < 80 and re.match(r"^[A-Z]", lines_before[-1]) and not _is_bad_title(lines_before[-1]):
+                    title = lines_before[-1]
+                first_pos = max(0, first_pos - 800) + outline_m.start()
+
+            if not title or _is_bad_title(title):
+                front_slice = self.text[:max(toc_end, 45000)]
+                toc_m = (
+                    re.search(r'(?im)^[ \t]*Chapter\s+' + str(ch_num) + r'\b[:\s\-–—]+([A-Z][^\n]{3,80})\s*$', front_slice)
+                    or re.search(r'(?im)^[ \t]*([A-Z][^\n]{3,80})\s+(?:\d{1,4}\s+)?\n[ \t]*' + str(ch_num) + r'\s*\n[ \t]*(?:Introduction|' + str(ch_num) + r'\.1)\b', front_slice)
+                    or re.search(r'(?im)^[ \t]*' + str(ch_num) + r'\b[:\s.\-–—]+([A-Z][^\n]{3,80})\s*$', front_slice)
+                )
+                if toc_m and not _is_bad_title(toc_m.group(1).strip()):
+                    title = toc_m.group(1).strip()
+                else:
+                    title = first_title
+
+            title = re.sub(r'\s+\d{1,4}\s*$', '', title).strip()
+            clean_ch_title = re.sub(r'^(?:chapter|unit|part)\s+\d+[:\s-]*', '', title, flags=re.I).strip()
+            final_title = clean_ch_title or title
             spots.append(HeadingSpot(
                 pos=first_pos,
                 number=ch_num,
-                title=f"Chapter {ch_num}: {title}",
-                line=f"Chapter {ch_num}: {title}",
+                title=final_title,
+                line=f"Chapter {ch_num}: {final_title}",
                 level=1
             ))
         return sorted(spots, key=lambda s: s.pos)
@@ -635,10 +1050,10 @@ class BookStructurer:
 
     # Bumped for patterns that carry an explicit, unambiguous publisher signal.
     _SPECIFICITY = {
-        "grouped_numdot": 0.08,
+        "grouped_numdot": 0.04,
         "chapter_digits": 0.05, "chapter_roman": 0.05, "chapter_word": 0.05,
         "unit_digits": 0.03, "unit_roman": 0.03, "lesson_digits": 0.03,
-        "hash_headings": 0.02, "numbered_dot": 0.02, "numbered_bare": 0.0,
+        "hash_headings": 0.02, "bare_num_title": 0.03, "numbered_dot": 0.02, "numbered_bare": 0.0,
         "titled_caps": -0.25,
     }
 
@@ -654,12 +1069,30 @@ class BookStructurer:
                  + self._SPECIFICITY.get(kind, 0.0))
         if is_unit:
             score -= 0.08
-        if style == "order" and spread < 0.4:
+        if kind == "hash_headings" and spread < 0.35:
+            score -= 0.35        # low-spread hash lines are local markdown comments/code, not whole book chapters
+        elif style == "order" and spread < 0.4:
             score -= 0.15        # a heading-less book is better handled by chunking
         return {"kind": kind, "style": style, "is_unit": is_unit, "spots": spots,
                 "score": max(score, 0.0), "seq": seq, "spread": spread,
                 "quality": quality}
 
+
+    @staticmethod
+    def _is_preprocessor_or_code(line: str, title: str) -> bool:
+        s_line = (line or "").strip()
+        s_title = (title or "").strip()
+        if re.match(r"^#(?:include|define|undef|ifdef|ifndef|endif|if|elif|else|error|pragma|line|warning|import)\b", s_line, re.IGNORECASE):
+            return True
+        if re.match(r"^(?:include|define|undef|ifdef|ifndef|endif|if|elif|else|error|pragma|line|warning|import)\b", s_title, re.IGNORECASE):
+            return True
+        if re.search(r"<\s*[\w\.\/]+\s*>|\/\*|\*\/|;|{|}|\(\)", s_title):
+            return True
+        if re.search(r"-\*-|(?:\.py|\.h|\.cpp|\.c|\.js|\.html|\.css)\b|https?:\/\/|\b(?:todo|models|views|urls|serializers|settings|admin)\.py", s_title, re.IGNORECASE):
+            return True
+        if re.match(r"^(?:create|register|generated by|import|from|class|def|var|let|const|return)\b", s_title, re.IGNORECASE):
+            return True
+        return False
 
     def _hash_spots(self, regex: re.Pattern) -> List[HeadingSpot]:
         """Picks the markdown heading level that behaves like chapters."""
@@ -668,6 +1101,8 @@ class BookStructurer:
             level = len(m.group(1))
             title = m.group(2).strip()
             if not title or len(title) > 110:
+                continue
+            if self._is_preprocessor_or_code(m.group(0), title):
                 continue
             bucket.setdefault(level, []).append(
                 HeadingSpot(pos=m.start(), number=0, title=title,
@@ -852,10 +1287,16 @@ class BookStructurer:
     @staticmethod
     def fallback_title(chunk: str, max_words: int = 8) -> str:
         """Readable placeholder title for a heading-less chunk."""
-        first = re.split(r"(?<=[.:!?])\s|\n", (chunk or "").strip())[0] or ""
-        words = re.sub(r"\s+", " ", first).strip().strip(".:;,").split(" ")
-        title = " ".join(words[:max_words]).strip()
-        return title if len(title) >= 8 else ""
+        for line in (chunk or "").split("\n"):
+            s = line.strip()
+            if not s or s.startswith(("#", "//", "/*", "*", "{", "}", "<")):
+                continue
+            first = re.split(r"(?<=[.:!?])\s|\n", s)[0] or ""
+            words = re.sub(r"\s+", " ", first).strip().strip(".:;,").split(" ")
+            title = " ".join(words[:max_words]).strip()
+            if len(title) >= 8:
+                return title
+        return ""
 
     # ------------------------------------------------------------------ #
     # Unit-level inference

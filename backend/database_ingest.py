@@ -178,6 +178,71 @@ class DatabaseIngestPipeline:
 
         return len(ids)
 
+    def ingest_custom_chunks_batch(
+        self,
+        batch_items: list[dict],
+    ) -> int:
+        """
+        Batches ingestion across multiple chapters into consolidated ChromaDB upsert calls.
+        Reduces embedding overhead and Chroma client round-trips significantly.
+        """
+        import hashlib
+        if not batch_items:
+            return 0
+
+        ids = []
+        documents = []
+        metadatas = []
+
+        for item in batch_items:
+            course_id = item.get("course_id", "")
+            chunks = item.get("chunks", [])
+            subject = item.get("subject", "General")
+            academic_tier = item.get("academic_tier", "Custom")
+            chapter_id = item.get("chapter_id", "ch_1")
+            chapter_index = item.get("chapter_index", 1)
+            chapter_title = item.get("chapter_title", "")
+
+            unique_chunks_map = {}
+            for c in chunks:
+                clean_c = c.strip()
+                if len(clean_c) > 40:
+                    chunk_hash = hashlib.sha256(clean_c.encode('utf-8')).hexdigest()[:16]
+                    if chunk_hash not in unique_chunks_map:
+                        unique_chunks_map[chunk_hash] = clean_c
+
+            for chunk_hash, text in unique_chunks_map.items():
+                doc_id = f"{course_id}_{chapter_id}_{chunk_hash}"
+                ids.append(doc_id)
+                documents.append(text)
+                metadatas.append({
+                    "course_id": course_id,
+                    "chapter_id": chapter_id,
+                    "chapter_index": chapter_index,
+                    "chapter_title": chapter_title or f"Chapter {chapter_index}",
+                    "subject": subject,
+                    "academic_tier": academic_tier,
+                    "content_hash": chunk_hash,
+                    "data_integrity_status": "verified"
+                })
+
+        if not ids:
+            return 0
+
+        batch_size = 200
+        for start_idx in range(0, len(ids), batch_size):
+            end_idx = start_idx + batch_size
+            try:
+                self.curriculum_collection.upsert(
+                    ids=ids[start_idx:end_idx],
+                    documents=documents[start_idx:end_idx],
+                    metadatas=metadatas[start_idx:end_idx],
+                )
+            except Exception as e:
+                print(f"[ChromaDB] Batch upsert warning: {e}")
+
+        return len(ids)
+
     def delete_course_vectors(self, course_id: str) -> int:
         """Purges all vector embeddings associated with a deleted course to keep vector store lean."""
         try:

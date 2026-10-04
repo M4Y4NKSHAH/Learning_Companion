@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AURA · Lesson prototype</title>
+<style>
+:root{--bg:#EAE4D8;--panel:#FAF6EF;--ink:#2B2723;--mute:#6B635A;--line:rgba(43,39,35,.14);--ember:#A5623A;--olive:#5E7A3E;--clay:#A85B56;--amber:#9A6B16;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1E1B18;--panel:#2A2622;--ink:#EDE6DA;--mute:#A89F93;--line:rgba(237,230,218,.16);--ember:#D08A5E;--olive:#97B56F;--clay:#D58A84;--amber:#D9A94A}}
+:root[data-theme="dark"]{--bg:#1E1B18;--panel:#2A2622;--ink:#EDE6DA;--mute:#A89F93;--line:rgba(237,230,218,.16);--ember:#D08A5E;--olive:#97B56F;--clay:#D58A84;--amber:#D9A94A}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Outfit,system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:1040px;margin:0 auto;padding:20px 16px 60px;display:grid;grid-template-columns:270px 1fr;gap:22px}
+@media(max-width:800px){.wrap{grid-template-columns:1fr}}
+aside{border-right:1px solid var(--line);padding-right:16px;max-height:92vh;overflow:auto}
+@media(max-width:800px){aside{border:0;padding:0;max-height:none}}
+h1{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:0 0 10px;font-weight:600}
+details{margin:2px 0}summary{cursor:pointer;font-weight:600;font-size:14px;padding:5px 0}
+.sec{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:var(--mute);padding:3px 0 3px 12px;border-left:2px solid var(--line)}
+.sec.live{color:var(--ink);border-color:var(--ember);font-weight:600;cursor:pointer}.sec b{font-weight:400;white-space:nowrap}
+.note{font-size:12.5px;color:var(--mute);margin:10px 0}
+main{min-width:0}.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:14px}
+.src{font-size:12.5px;color:var(--mute);margin-bottom:6px}.dots{display:flex;gap:6px;margin:6px 0 14px}.dots i{height:5px;flex:1;border-radius:3px;background:var(--line)}.dots i.on{background:var(--ember)}.dots i.done{background:var(--olive)}
+h2{font-size:22px;margin:0 0 8px;line-height:1.25}p{margin:0 0 12px}
+.q{font-weight:600}button{font:inherit;cursor:pointer;border:1px solid var(--ink);background:transparent;color:var(--ink);border-radius:9px;padding:8px 14px}
+button:hover{background:var(--ink);color:var(--bg)}button.pri{background:var(--ember);border-color:var(--ember);color:#fff}button.pri:hover{filter:brightness(.92);background:var(--ember);color:#fff}
+.opts{display:grid;gap:8px;margin:12px 0}.opts button{text-align:left}
+input[type=text],textarea{width:100%;font:inherit;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:10px}
+.fb{border-left:3px solid var(--line);padding:4px 0 4px 12px;margin:10px 0}.fb.ok{border-color:var(--olive)}.fb.part{border-color:var(--amber)}.fb.no{border-color:var(--clay)}
+.fb li{margin:3px 0}.tag{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+.grid{display:grid;grid-template-columns:repeat(20,1fr);gap:3px;margin:12px 0}.grid div{aspect-ratio:1;border-radius:3px;background:var(--olive);opacity:.9;font-size:9px;display:flex;align-items:center;justify-content:center;color:#fff}
+.grid .x{background:var(--line);color:transparent}.grid .g{background:var(--clay)}.grid .t{outline:2px solid var(--ink)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}.stat{font-size:14px;color:var(--mute)}
+.hint{background:var(--bg);border-radius:9px;padding:10px 12px;margin-top:10px;font-size:15px}
+</style></head><body>
+<div class="wrap">
+<aside><h1>Verified book map</h1>
+<p class="note">Read from the PDF's own 129 bookmarks (no regex guessing). Words per section show why a "section" is still too big for one lesson. Only 1.1 has a lesson in this prototype.</p>
+<div id="map"></div></aside>
+<main><div class="src" id="src"></div><div class="dots" id="dots"></div><div id="stage"></div></main>
+</div>
+<script>
+const TREE=[{"n":1,"t":"Introduction to Computer Science","s":[{"t":"1.1 Computer Science","w":5238},{"t":"1.2 Computer Science across the Disciplines","w":2434},{"t":"1.3 Computer Science and the Future of Society","w":3804}]},{"n":2,"t":"Computational Thinking and Design Reusability","s":[{"t":"2.1 Computational Thinking","w":4728},{"t":"2.2 Architecting Solutions with Adaptive Design Reuse in Mind","w":7417},{"t":"2.3 Evolving Architectures into Useable Products","w":3298}]},{"n":3,"t":"Data Structures and Algorithms","s":[{"t":"3.1 Introduction to Data Structures and Algorithms","w":4319},{"t":"3.2 Algorithm Design and Discovery","w":3853},{"t":"3.3 Formal Properties of Algorithms","w":3202},{"t":"3.4 Algorithmic Paradigms","w":2924},{"t":"3.5 Sample Algorithms by Problem","w":3121},{"t":"3.6 Computer Science Theory","w":2580}]},{"n":4,"t":"Linguistic Realization of Algorithms: Low-Level Programming Languages","s":[{"t":"4.1 Models of Computation","w":4778},{"t":"4.2 Building C Programs","w":6081},{"t":"4.3 Parallel Programming Models","w":2415},{"t":"4.4 Applications of Programming Models","w":1109}]},{"n":5,"t":"Hardware Realizations of Algorithms: Computer Systems Design","s":[{"t":"5.1 Computer Systems Organization","w":1977},{"t":"5.2 Computer Levels of Abstraction","w":3787},{"t":"5.3 Machine-Level Information Representation","w":3452},{"t":"5.4 Machine-Level Program Representation","w":3391},{"t":"5.5 Memory Hierarchy","w":3994},{"t":"5.6 Processor Architectures","w":1543}]},{"n":6,"t":"Infrastructure Abstraction Layer: Operating Systems","s":[{"t":"6.1 What Is an Operating System?","w":2959},{"t":"6.2 Fundamental OS Concepts","w":4612},{"t":"6.3 Processes and Concurrency","w":5057},{"t":"6.4 Memory Management","w":3185},{"t":"6.5 File Systems","w":2755},{"t":"6.6 Reliability and Security","w":3431}]},{"n":7,"t":"High-Level Programming Languages","s":[{"t":"7.1 Programming Language Foundations","w":4866},{"t":"7.2 Programming Language Constructs","w":8018},{"t":"7.3 Alternative Programming Models","w":4199},{"t":"7.4 Programming Language Implementation","w":2962}]},{"n":8,"t":"Data Management","s":[{"t":"8.1 Data Management Focus","w":2809},{"t":"8.2 Data Management Systems","w":2553},{"t":"8.3 Relational Database Management Systems","w":7974},{"t":"8.4 Nonrelational Database Management Systems","w":3297},{"t":"8.5 Data Warehousing, Data Lakes, and Business Intelligence","w":1855},{"t":"8.6 Data Management for Shallow and Deep Learning Applications","w":4856},{"t":"8.7 Informatics and Data Management","w":778}]},{"n":9,"t":"Software Engineering","s":[{"t":"9.1 Software Engineering Fundamentals","w":5580},{"t":"9.2 Software Engineering Process","w":14586},{"t":"9.3 Special Topics","w":9388}]},{"n":10,"t":"Enterprise and Solution Architectures Management","s":[{"t":"10.1 Patterns Management","w":2679},{"t":"10.2 Enterprise Architecture Management Frameworks","w":8273},{"t":"10.3 Solution Architecture Management","w":1948}]},{"n":11,"t":"Web Applications Development","s":[{"t":"11.1 Modern Web Applications Architectures","w":7460},{"t":"11.2 Sample Responsive WAD with Bootstrap and Django","w":4391},{"t":"11.3 Sample Responsive WAD with Bootstrap/React and Node","w":3397},{"t":"11.4 Sample Responsive WAD with Bootstrap/React and Django","w":1059},{"t":"11.5 Sample Native WAD with React Native and Node or Django","w":1875},{"t":"11.6 Sample Ethereum Blockchain Web 2.0/Web 3.0 Application","w":2351}]},{"n":12,"t":"Cloud-Native Applications Development","s":[{"t":"12.1 Introduction to Cloud-Native Applications","w":8496},{"t":"12.2 Cloud-Based and Cloud-Native Applications Deployment Technologies","w":8491},{"t":"12.3 Example PaaS and FaaS Deployments of Cloud-Native Applications","w":11824}]},{"n":13,"t":"Hybrid Multicloud Digital Solutions Development","s":[{"t":"13.1 Hybrid Multicloud Solutions and Cloud Mashups","w":2246},{"t":"13.2 Big Cloud IaaS Mainstream Capabilities","w":3893},{"t":"13.3 Big Cloud PaaS Mainstream Capabilities","w":8291},{"t":"13.4 Towards Intelligent Autonomous Networked Super Systems","w":6646}]},{"n":14,"t":"Cyber Resources Qualities and Cyber Computing Governance","s":[{"t":"14.1 Cyber Resources Management Frameworks","w":12014},{"t":"14.2 Cybersecurity Deep Dive","w":26593},{"t":"14.3 Governing the Use of Cyber Resources","w":2807}]}];
+const $=s=>document.querySelector(s);
+// ---- map
+$('#map').innerHTML=TREE.map(c=>`<details ${c.n==1?'open':''}><summary>${c.n}. ${c.t}</summary>`+c.s.map(s=>`<div class="sec ${s.t.startsWith('1.1')?'live':''}" ${s.t.startsWith('1.1')?'onclick="go(0)"':''}><span>${s.t}</span><b>${s.w.toLocaleString()}w</b></div>`).join('')+`</details>`).join('');
+$('#src').textContent='From: 1.1 Computer Science · pp. 20–29 · lesson 2 of the section: "How an algorithm finds things"';
+// ---- lesson state
+const STEPS=['Predict','Try it','Explain','Transfer','Wrap-up'];let step=0,hintN=0,S={};
+function dots(){$('#dots').innerHTML=STEPS.map((_,i)=>`<i class="${i<step?'done':i==step?'on':''}" title="${STEPS[i]}"></i>`).join('')}
+function go(n){step=n;hintN=0;dots();[p1,p2,p3,p4,p5][n]()}
+function stage(h){$('#stage').innerHTML=`<div class="card">${h}</div>`}
+// 1 PREDICT (diagnose before teaching)
+function p1(){stage(`<span class="tag">Step 1 · Predict</span><h2>A sorted list has 100 names. You must find one.</h2>
+<p>The book's own example: a recipe is an algorithm, and so is searching. Before I show you anything: if you could pick any strategy, what is the <i>most</i> guesses you would ever need to find a name?</p>
+<div class="opts">${[['About 100','one at a time'],['About 50','on average half of them'],['About 7','something cleverer'],['About 10','roughly the square root']].map((o,i)=>`<button onclick="pick(${i})"><b>${o[0]}</b> <span class="stat">— ${o[1]}</span></button>`).join('')}</div>`)}
+function pick(i){S.pred=i;stage(`<span class="tag">Step 1 · Predict</span><h2>You chose "${['About 100','About 50','About 7','About 10'][i]}". Hold that thought.</h2><p>Nothing is revealed yet. Next you will test it: play the guessing game below with two strategies and watch what your guesses actually do to the list.</p><button class="pri" onclick="go(1)">Test it →</button>`)}
+// 2 TRY IT (interactive visual, one relationship)
+let lo,hi,tg,cnt,gs;
+function reset(){lo=1;hi=100;tg=1+Math.floor(Math.random()*100);cnt=0;gs=new Set();draw()}
+function p2(){stage(`<span class="tag">Step 2 · Try it</span><h2>Guess my number (1–100)</h2>
+<p>Green = still possible. Grey = ruled out. Try <b>Middle</b> a few rounds, then <b>Random</b> a few rounds.</p>
+<div class="grid" id="g"></div><div class="row"><button class="pri" onclick="guess('m')">Guess the middle</button><button onclick="guess('r')">Guess a random number</button><button onclick="reset()">New number</button></div>
+<div class="stat" id="st"></div><div class="stat" id="log"></div>
+<p class="q" style="margin-top:14px">After a few rounds: what is the most guesses "Middle" ever needed? Does it match your prediction?</p>
+<button onclick="go(2)">I have a number in mind →</button>`);S.log=[];reset()}
+function draw(){let h='';for(let i=1;i<=100;i++)h+=`<div class="${i<lo||i>hi?'x':''} ${gs.has(i)?'g':''} ${i==tg&&cnt&&lo==hi?'t':''}">${gs.has(i)?i:''}</div>`;$('#g').innerHTML=h;$('#st').textContent=`Possible numbers left: ${hi-lo+1} · guesses so far: ${cnt}`}
+function guess(k){if(lo>hi)return;if(lo==hi&&gs.has(tg)){return}
+ const g=k=='m'?Math.floor((lo+hi)/2):lo+Math.floor(Math.random()*(hi-lo+1));cnt++;gs.add(g);
+ let msg;if(g==tg){msg=`Found ${tg} in ${cnt} guesses with ${k=='m'?'Middle':'Random'}.`;lo=hi=tg;S.log.push([k,cnt]);}
+ else if(g<tg){lo=g+1;msg=`${g} is too low → everything ≤ ${g} is ruled out.`}else{hi=g-1;msg=`${g} is too high → everything ≥ ${g} is ruled out.`}
+ draw();$('#log').textContent=msg}
+// 3 EXPLAIN (rubric feedback, never a bare score)
+const RUB=[{k:'sorted',t:'The list being sorted is what makes a single comparison informative',re:/sort|order|alphabet|numeric/i,hint:'What would be different if the names were in random order?'},
+{k:'half',t:'Each guess removes about half of what is left',re:/half|50 ?%|halv|cut .*(in|by)|discard|eliminat|rule[sd]? out/i,hint:'Look at the grey squares after your first Middle guess: how much of the row turned grey?'},
+{k:'dir',t:'The answer "too high / too low" tells you which side to keep',re:/too (high|low)|higher|lower|bigger|smaller|greater|less|which (side|half)|direction/i,hint:'After a guess, what do you learn besides "wrong"?'}];
+function p3(){stage(`<span class="tag">Step 3 · Explain</span><h2>In your own words</h2><p>Why does guessing the <i>middle</i> beat guessing a random number? Two or three sentences, as if telling a friend.</p>
+<textarea id="ans" rows="4" placeholder="Because…"></textarea><div class="row"><button class="pri" onclick="grade()">Check my explanation</button><button onclick="hint()">I'm stuck — give me a hint</button></div><div id="fb"></div>`)}
+function grade(){const a=$('#ans').value.trim();if(a.length<12){$('#fb').innerHTML='<div class="fb part">Write a sentence or two first. A short attempt is fine; it does not need to be perfect.</div>';return}
+ const hit=RUB.filter(r=>r.re.test(a)),miss=RUB.filter(r=>!r.re.test(a));
+ const cls=hit.length==3?'ok':hit.length?'part':'no';
+ let h=`<div class="fb ${cls}"><b>${hit.length==3?'You have the whole idea.':hit.length?'You have part of it.':'Not there yet — and that is useful to know.'}</b><ul>`+hit.map(r=>`<li>✓ ${r.t}</li>`).join('')+miss.map(r=>`<li>○ <i>Missing:</i> ${r.t}</li>`).join('')+'</ul>';
+ if(miss.length)h+=`<p><b>One thing to look at:</b> ${miss[0].hint}</p>`;h+='</div>';
+ h+=hit.length==3?`<button class="pri" onclick="go(3)">Apply it to a bigger problem →</button>`:`<button onclick="hint()">Hint</button> <button onclick="go(3)">Skip for now</button>`;
+ S.expl=hit.length;$('#fb').innerHTML=h}
+function hint(){hintN=Math.min(hintN+1,3);const H=['<b>Nudge:</b> Think of 20 Questions. Why is "Is it an animal?" a better first question than "Is it a hamster?"','<b>Reminder:</b> Every guess gives you one bit of information: higher or lower. A good guess makes both answers equally useful.','<b>Parallel example (not your problem):</b> A dictionary has 1,000 words. Open to the middle word. It comes <i>after</i> yours alphabetically, so you can ignore the entire back half in one move. Now say what made that safe.'];
+ const el=document.getElementById('fb');el.insertAdjacentHTML('beforeend',`<div class="hint">${H[hintN-1]}</div>`)}
+// 4 TRANSFER (numeric with explained feedback)
+function p4(){stage(`<span class="tag">Step 4 · Transfer</span><h2>Now a million</h2><p>A sorted list has <b>1,000,000</b> entries. Using the middle-guess strategy, what is the <i>fewest guesses that always works</i>?</p>
+<p class="stat">Tip: after k guesses, how many entries can you tell apart? Try k=1, 2, 3 and look for the pattern.</p>
+<div class="row"><input type="text" id="n" inputmode="numeric" style="max-width:140px" placeholder="number"><button class="pri" onclick="chk()">Check</button></div><div id="fb"></div>`)}
+function chk(){const n=parseInt($('#n').value);if(!n){return}const c=2**n-1,need=1e6;let h;
+ if(n==20)h=`<div class="fb ok"><b>Exactly.</b> 20 guesses can distinguish up to 2²⁰ − 1 = 1,048,575 entries; 19 can only cover 524,287. Notice what happened: 100 entries needed 7, a million needs only 20. Doubling the list adds just <i>one</i> guess.</div><button class="pri" onclick="go(4)">Wrap up →</button>`;
+ else if(n<20)h=`<div class="fb part"><b>Close, but not enough.</b> With ${n} guesses you can separate at most 2<sup>${n}</sup> − 1 = ${c.toLocaleString()} entries, which is less than 1,000,000. Try a slightly larger number.</div>`;
+ else h=`<div class="fb part"><b>That would always work</b>, but is it the <i>fewest</i>? With ${n} guesses you can cover ${c.toLocaleString()} entries. Check whether one fewer guess is still enough.</div>`;
+ $('#fb').innerHTML=h}
+// 5 WRAP
+function p5(){const m=S.log.filter(x=>x[0]=='m').map(x=>x[1]),r=S.log.filter(x=>x[0]=='r').map(x=>x[1]);const f=a=>a.length?Math.max(...a):'—';
+ stage(`<span class="tag">Done</span><h2>What you now can do</h2><ul><li>Explain why <b>sorted + compare to the middle</b> lets one guess discard half the list.</li><li>Estimate guesses for any size: <b>about log₂(n)</b>, so 1,000,000 → 20.</li></ul>
+<p class="stat">Your play: Middle worst ${f(m)}, Random worst ${f(r)} (limit for 100 items with Middle: 7). Explanation check: ${S.expl??0}/3 ideas.</p>
+<p><b>Next lesson, chosen by what you did:</b> ${S.expl==3?'3.2 Algorithm Design — now that you can analyse one algorithm, learn how to invent one.':'a 2-minute revisit of "why sorted matters", then 3.2.'}</p>
+<button onclick="S={};go(0)">Restart</button>`)}
+S.log=[];go(0);
+</script></body></html>

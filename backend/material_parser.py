@@ -25,7 +25,7 @@ class MaterialParser:
     """
 
     @staticmethod
-    def extract_text_from_pdf_bytes(pdf_bytes: bytes, max_pages: int = 80) -> str:
+    def extract_text_from_pdf_bytes(pdf_bytes: bytes, max_pages: Optional[int] = None) -> str:
         """Extracts text content from in-memory PDF binary stream with high speed & error tolerance."""
         extracted_pages = []
 
@@ -34,7 +34,8 @@ class MaterialParser:
             try:
                 doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
                 total_pages = len(doc)
-                for idx in range(min(total_pages, max_pages)):
+                page_limit = min(total_pages, max_pages) if (max_pages and max_pages > 0) else total_pages
+                for idx in range(page_limit):
                     try:
                         page = doc.load_page(idx)
                         text = page.get_text("text").strip()
@@ -57,7 +58,7 @@ class MaterialParser:
 
             total_pages = len(reader.pages)
             for idx, page in enumerate(reader.pages):
-                if idx >= max_pages:
+                if max_pages and max_pages > 0 and idx >= max_pages:
                     break
                 try:
                     text = page.extract_text() or ""
@@ -76,7 +77,7 @@ class MaterialParser:
         return "\n\n".join(extracted_pages)
 
     @staticmethod
-    def extract_text_from_document_bytes(file_bytes: bytes, filename: str = "", max_pages: int = 150) -> str:
+    def extract_text_from_document_bytes(file_bytes: bytes, filename: str = "", max_pages: Optional[int] = None) -> str:
         """Extracts text content from in-memory binary stream (PDF, EPUB, MOBI, etc.) with high speed."""
         ext = os.path.splitext(filename)[1].lower().lstrip(".") if filename else "pdf"
         extracted_pages = []
@@ -86,7 +87,8 @@ class MaterialParser:
                 fitz_type = ext if ext in ["pdf", "epub", "mobi", "xps", "fb2"] else "pdf"
                 doc = pymupdf.open(stream=file_bytes, filetype=fitz_type)
                 total_pages = len(doc)
-                for idx in range(min(total_pages, max_pages)):
+                page_limit = min(total_pages, max_pages) if (max_pages and max_pages > 0) else total_pages
+                for idx in range(page_limit):
                     try:
                         page = doc.load_page(idx)
                         text = page.get_text("text").strip()
@@ -103,7 +105,8 @@ class MaterialParser:
         if ext == "pdf" and PYPDF_AVAILABLE:
             try:
                 reader = pypdf.PdfReader(io.BytesIO(file_bytes))
-                for idx, page in enumerate(reader.pages[:max_pages]):
+                pages_to_read = reader.pages[:max_pages] if (max_pages and max_pages > 0) else reader.pages
+                for idx, page in enumerate(pages_to_read):
                     text = (page.extract_text() or "").strip()
                     if text:
                         extracted_pages.append(f"--- Page {idx + 1} ---\n{text}")
@@ -119,13 +122,60 @@ class MaterialParser:
             raise RuntimeError(f"Unable to parse document '{filename}'. Supported formats: PDF, EPUB, MOBI, TXT, MD.")
 
     @staticmethod
+    def extract_book(source: Any, filename: str = ""):
+        """Extracts structured ExtractedBook (pages, outline, running headers)."""
+        is_bytes = isinstance(source, (bytes, bytearray))
+        ext = os.path.splitext(filename if is_bytes else str(source))[1].lower() if (filename or not is_bytes) else ""
+        if is_bytes:
+            if ext == ".pdf" or source.startswith(b"%PDF"):
+                try:
+                    from backend.book_extract import extract_pdf
+                except ImportError:
+                    from book_extract import extract_pdf
+                return extract_pdf(source)
+            text = source.decode("utf-8", errors="replace")
+            try:
+                from backend.book_extract import PageText, ExtractedBook
+            except ImportError:
+                from book_extract import PageText, ExtractedBook
+            return ExtractedBook(pages=[PageText(page_index=1, text=text)])
+
+        if not os.path.exists(source):
+            raise FileNotFoundError(f"File not found: {source}")
+        if ext == ".pdf":
+            try:
+                from backend.book_extract import extract_pdf
+            except ImportError:
+                from book_extract import extract_pdf
+            return extract_pdf(source)
+        with open(source, "r", encoding="utf-8", errors="replace") as f:
+            text = f.read()
+        try:
+            from backend.book_extract import PageText, ExtractedBook
+        except ImportError:
+            from book_extract import PageText, ExtractedBook
+        return ExtractedBook(pages=[PageText(page_index=1, text=text)])
+
+    @staticmethod
     def extract_text_from_file(file_path: str) -> str:
         """Extracts text from a given file path on disk (PDF, EPUB, MOBI, TXT, MD)."""
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
             
         ext = os.path.splitext(file_path)[1].lower()
-        if ext in [".pdf", ".epub", ".mobi", ".xps", ".fb2"]:
+        if ext == ".pdf":
+            try:
+                try:
+                    from backend.book_extract import extract_pdf
+                except ImportError:
+                    from book_extract import extract_pdf
+                book = extract_pdf(file_path)
+                return book.text
+            except Exception as e:
+                print(f"[MaterialParser] extract_pdf error: {e}. Falling back to byte extractor.")
+                with open(file_path, "rb") as f:
+                    return MaterialParser.extract_text_from_document_bytes(f.read(), filename=file_path)
+        elif ext in [".epub", ".mobi", ".xps", ".fb2"]:
             with open(file_path, "rb") as f:
                 return MaterialParser.extract_text_from_document_bytes(f.read(), filename=file_path)
         else:
@@ -327,6 +377,16 @@ class MaterialParser:
                     "pos": m.start()
                 })
 
+            # Deduplicate sections by sec_idx for each chapter
+            for ch_idx in grouped_chapters:
+                seen_sec = set()
+                deduped_secs = []
+                for s in grouped_chapters[ch_idx]["sections"]:
+                    if s["sec_idx"] not in seen_sec:
+                        seen_sec.add(s["sec_idx"])
+                        deduped_secs.append(s)
+                grouped_chapters[ch_idx]["sections"] = deduped_secs
+
             sorted_chs = sorted(grouped_chapters.keys())
             major_theory_chapters: List[Dict[str, Any]] = []
             for i, ch_num in enumerate(sorted_chs):
@@ -339,24 +399,40 @@ class MaterialParser:
                 if review_m:
                     ch_text = ch_text[:review_m.start()].strip()
 
-                # Try to find the actual parent chapter heading (# or ## heading) appearing just before
-                # the first subsection block — this gives us "Computer Science" instead of a subsection title.
-                pre_text = cleaned[max(0, first_pos - 800):first_pos]
+                # Try to find the actual parent chapter heading appearing just before
+                # the first subsection block, or from the chapter's title page/intro
+                pre_text = cleaned[max(0, first_pos - 1200):first_pos]
                 parent_heading_m = re.search(r'(?:^|\n)[ \t]*#{1,2}[ \t]+([A-Z][^\n]{3,80})\s*$', pre_text)
+                ch_explicit_m = re.search(r'(?im)^[ \t]*Chapter\s+' + str(ch_num) + r'\b[:\s\-–—]+([A-Z][^\n]{3,80})\s*$', cleaned[:next_pos])
+                bare_outline_m = re.search(r'(?im)^[ \t]*' + str(ch_num) + r'[ \t]*\n[ \t]*([A-Z][^\n]{3,80})\s*\n(?:[^\n]*\n)*?[ \t]*chapter\s+outline\b', cleaned[:next_pos])
+                inverted_num_m = re.search(r'(?im)^[ \t]*([A-Z][A-Za-z\s]{3,80})\s*\n[ \t]*' + str(ch_num) + r'\s*$', cleaned[:next_pos])
+
                 if parent_heading_m:
                     main_title = parent_heading_m.group(1).strip()
+                elif ch_explicit_m:
+                    main_title = ch_explicit_m.group(1).strip()
+                elif bare_outline_m:
+                    main_title = bare_outline_m.group(1).strip()
+                elif inverted_num_m and inverted_num_m.group(1).strip().lower() not in ("contents", "table of contents", "preface"):
+                    main_title = inverted_num_m.group(1).strip()
                 else:
                     main_title = grouped_chapters[ch_num]["main_title"]
+
                 clean_ch_title = f"Chapter {ch_num}: {main_title}"
                 if len(ch_text) >= 800:
+                    unique_subs = []
+                    seen_labels = set()
+                    for s in grouped_chapters[ch_num]["sections"]:
+                        lbl = f"{ch_num}.{s['sec_idx']}"
+                        if lbl not in seen_labels:
+                            seen_labels.add(lbl)
+                            unique_subs.append({"sec_idx": lbl, "title": s["title"]})
+
                     major_theory_chapters.append({
                         "chapter_index": len(major_theory_chapters) + 1,
                         "title": clean_ch_title,
                         "content": ch_text,
-                        "subsections": [
-                            {"sec_idx": f"{ch_num}.{s['sec_idx']}", "title": s["title"]}
-                            for s in grouped_chapters[ch_num]["sections"]
-                        ]
+                        "subsections": unique_subs
                     })
 
             if major_theory_chapters:
