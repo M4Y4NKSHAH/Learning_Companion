@@ -14,7 +14,7 @@ AURA is a **glass-box AI tutoring platform**: the student picks a subject
 (Physics / Biology / Mathematics) and a level (Class 10 / Class 11-12 / Undergraduate),
 then studies flashcards, practices short answers, takes a timed exam, and chats with an
 agentic tutor. Every interaction is scored by a **Mamdani-style fuzzy inference system**
-(accuracy × latency → mastery tier), answered using **Gemini 2.5 Flash** grounded in
+(accuracy × latency → mastery tier), answered using **Gemini 3.8 Flash** (or local Ollama) grounded in
 **ChromaDB textbook RAG**, and routed through a **LangGraph state machine** that visibly
 reports *which cognitive node* is active (Surface / Deep / Direct) — that's the "glass box".
 
@@ -26,7 +26,7 @@ reports *which cognitive node* is active (Surface / Deep / Direct) — that's th
 | --- | --- |
 | Repo branches | `main` (stable), `feature-landing-page` (current work) |
 | Frontend | React 18 · Vite 5 · Tailwind 3 · lucide-react |
-| Backend | FastAPI · uvicorn · LangGraph · LangChain · Gemini 2.5 Flash |
+| Backend | FastAPI · uvicorn · LangGraph · LangChain · Gemini 3.8 Flash / Ollama |
 | Vector store | ChromaDB persistent, collection `curriculum_repository` |
 | Fuzzy engine | Custom Mamdani-style system in `backend/fuzzy_engine.py` |
 | Backend port | `127.0.0.1:8000` |
@@ -79,10 +79,11 @@ reports *which cognitive node* is active (Surface / Deep / Direct) — that's th
 - **JSON field names:** frontend uses camelCase in payloads (`current_subject`,
   `current_tier`, `time_taken`, `consecutive_errors`); backend returns snake_case
   (`fuzzy_score`, `performance_tier`, `gap_analysis`).
-- **Every LLM call must have a fallback path** — no API key must mean graceful degradation.
+- **Every LLM call must have a fallback path** — no API key must mean graceful degradation to local Ollama or academic blueprints.
 - **Hints never leak the answer** — run output through `hint_utils.sanitize_*`.
 - **Flashcards are cached** per `(subject, tier)`; don't call Gemini in a loop.
-- **LLM model:** `gemini-2.5-flash` everywhere (do not diverge without reason).
+- **LLM model:** `gemini-3.8-flash` (with fallback to `gemini-flash-latest`) normalized via `normalize_ai_content`.
+- **Theory Grounding:** Expanded context window (30,000 chars) ensures LLM sees authentic equations/derivations; offline mode uses domain blueprints covering Algebra, Calculus, Physics, and CS.
 - **UI theme tokens:** the frontend uses the custom Japandi palette in
   `frontend/tailwind.config.js` (`japandiPalette`) — `sand` for paper/ink neutrals (replaced
   `slate`), `ember` for primary/Physics (replaced `blue`), `olive` for Biology (replaced

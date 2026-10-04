@@ -1,7 +1,7 @@
 # 🧠 Learning Companion (AURA)
 
 > **Glass-Box Multi-Agent Socratic Tutoring Platform**  
-> Powered by FastAPI, LangGraph, Local Ollama (`llama3.2:3b`), Google Gemini, ChromaDB + BM25 Hybrid RAG, and React (Japandi Design System).
+> Powered by FastAPI, LangGraph, Local Ollama (`llama3.2:3b`), Google Gemini (`gemini-3.8-flash`), ChromaDB + BM25 Hybrid RAG, and React (Japandi Design System).
 
 ---
 
@@ -13,7 +13,7 @@ Unlike traditional "black-box" LLM tutors, Learning Companion exposes its reason
 - **Cognitive Routing Telemetry:** Watch the agent switch between *Course Guardrail Deflection*, *Socratic Hinting*, *Surface Analogy*, *Deep Decomposition*, and *Direct Instruction*.
 - **Pedagogical Guardrails:** Enforces strict academic level ceilings. A Class 9 student will **never** receive Class 12 calculus ($\frac{dy}{dx}, \int$), tensors, or university jargon, while Class 12 students receive structured mathematical derivations.
 - **Authoritative Course Grounding:** The student's initial uploaded course material serves as the Primary Ground Truth via Hybrid RAG (BM25 lexical ranking + ChromaDB vector embeddings) with strict chapter-level isolation.
-- **100% Offline Local LLM:** Runs on consumer GPUs (NVIDIA RTX 2050 4GB) via Ollama (`llama3.2:3b`) with zero cloud token consumption and complete data privacy, backed by Gemini Cloud and rule-based fallbacks.
+- **100% Offline Local LLM:** Runs on consumer GPUs (NVIDIA RTX 2050 4GB) via Ollama (`llama3.2:3b`) with zero cloud token consumption and complete data privacy, backed by Gemini 3.8 Flash Cloud and rule-based fallbacks.
 - **Mamdani Fuzzy Inference System:** Multi-parameter evaluation that dynamically computes student mastery, error severity, response latency, and monotonic hint penalties.
 - **Japandi Aesthetic UI:** Minimalist, serene, and warm design engineered for calm, distraction-free study sessions.
 
@@ -47,7 +47,7 @@ Unlike traditional "black-box" LLM tutors, Learning Companion exposes its reason
         +---------------------------+
         | Multi-Tier LLM Engine     |
         | 1. Local Ollama (3B, 0$)  |
-        | 2. Cloud Gemini Flash     |
+        | 2. Cloud Gemini 3.8 Flash |
         | 3. Curated Rule Matrix    |
         +---------------------------+
 ```
@@ -81,11 +81,13 @@ Learning_Companion/
 │   ├── fuzzy_engine.py             # Mamdani fuzzy evaluation engine
 │   ├── hint_utils.py               # Answer-leak sanitization & prompt guards
 │   ├── theory_repo.py              # Static curriculum banks & fallback theory
-│   ├── tests/                      # Dedicated automated test suites (43/43 passed)
+│   ├── tests/                      # Dedicated automated test suites (61/61 passed)
 │   │   ├── test_book_structurer.py        # Heading scoring, TOC pruning & layout tests
 │   │   ├── test_two_phase_ingestion.py    # Two-phase async ingestion & crash-recovery tests
 │   │   ├── test_pedagogical_guardrails.py # Grade ceiling & deflection tests
 │   │   ├── test_content_aware_qg.py       # Fact extraction & assessment tests
+│   │   ├── test_theory_enhancement.py     # STEM blueprints, worked examples & equation protection
+│   │   ├── test_outline_ladder.py         # Multi-rung outline ladder & TOC tests
 │   │   ├── test_fuzzy_extended.py         # Comprehensive Mamdani test suite
 │   │   ├── test_tier1_features.py         # SM-2 & similarity tests
 │   │   ├── test_tier3_features.py         # BM25 & analytics tests
@@ -119,7 +121,7 @@ Learning_Companion/
   # (Recommended) Build the optimized Learning Companion model
   ollama create learning-companion -f training/Modelfile
   ```
-- **API Key (Optional fallback):** Google Gemini API Key in `.env`:
+- **API Key (Optional fallback):** Google Gemini API Key in `.env` (supports `gemini-3.8-flash`):
   ```env
   GEMINI_API_KEY=your_gemini_api_key_here
   ```
@@ -151,15 +153,16 @@ npm run dev
 
 ## 🧪 Testing & Quality Assurance
 
-Run the complete automated test suite across all 43 unit and integration tests:
+Run the complete automated test suite across all 61 unit and integration tests:
 
 ```powershell
 pytest backend/tests/ -v
 ```
 
-All 43 tests verify:
-- Universal book structure inference and TOC front-matter pruning (`test_book_structurer.py`).
+All 61 tests verify:
+- Universal book structure inference, running-header suppression, and TOC front-matter pruning (`test_book_structurer.py`, `test_outline_ladder.py`).
 - Two-phase ingestion with instant skeleton publication and background enrichment (`test_two_phase_ingestion.py`).
+- Grounded STEM theory generation, full worked problem extraction, and formula safeguards (`test_theory_enhancement.py`).
 - Grade-level ceiling enforcement (Class 9 vs Class 12).
 - Off-topic deflection guardrails.
 - Primary course material grounding.

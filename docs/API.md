@@ -12,6 +12,7 @@
 | POST | `/api/material/ingest` | Ingest raw text/notes/syllabus into structured chapters, flashcards & tests |
 | POST | `/api/material/upload` | Upload PDF, TXT, or Markdown document for automated course generation |
 | POST | `/api/material/course/{course_id}/enrich` | Resume or continue background LLM enrichment on skeletal course chapters |
+| POST | `/api/material/course/{course_id}/re-enrich` | Re-enrich existing courses on disk with updated theory blueprints or LLM synthesis |
 | GET | `/api/material/job/{job_id}/status` | Poll real-time progress for async ingestion or enrichment jobs |
 | GET | `/api/material/courses` | List all available standard and custom ingested courses |
 | GET | `/api/material/course/{course_id}` | Retrieve full course outline, chapters, objectives and assessment items |
@@ -301,6 +302,22 @@ Resumes or continues partial build enrichment for an existing course in the back
     "message": "Enrichment queued for course 'custom_phy_89a12c'.",
     "job_id": "job_e9f1a2b3",
     "course_id": "custom_phy_89a12c"
+  }
+  ```
+
+### `POST /api/material/course/{course_id}/re-enrich`
+Re-enriches pre-existing course files on disk with updated domain blueprints, corrected section boundaries, and Gemini 3.8 Flash or local LLM synthesis without requiring textbook re-upload. (Also accessible via alias `/api/courses/{course_id}/re-enrich`).
+
+- **Query / Payload Parameters**:
+  - `chapter_index` (int, optional): Specific chapter index to re-enrich (1-indexed). If omitted, re-enriches all chapters.
+  - `use_llm` (bool, default `true`): Whether to invoke Gemini 3.8 Flash / Ollama or apply academic offline blueprints.
+- **Response**:
+  ```json
+  {
+    "status": "success",
+    "course_id": "custom_math_algebra_trigonometry",
+    "enriched_chapters": [2],
+    "message": "Successfully re-enriched 1 chapter(s)."
   }
   ```
 

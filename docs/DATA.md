@@ -118,7 +118,7 @@ server restarts; ingestion is only required when adding new sources.
 
 ### AI path — `generate_gemini_flashcards_from_chroma(subject, tier)`
 1. Pull top-5 educational chunks from Chroma as prompt context.
-2. Ask `gemini-2.5-flash` (temp 0.3) for **exactly 3** cards as a strict JSON array.
+2. Ask `gemini-3.8-flash` (temp 0.3) for **exactly 3** cards as a strict JSON array.
 3. Parse & tag `"source": "gemini_rag"`, id `ai_<subj3>_<tier3>_<n>`.
 4. On any failure → fall back to the heuristic builder.
 5. Cached in `_gemini_flashcard_cache[(subject, tier)]`; returned via
@@ -153,7 +153,7 @@ analyze_depth:     Mamdani fuzzy score (accuracy heuristics × latency)
    │
    ▼
 discussion node:   prompt = [system: grounded context + node identity]
-                   [history...] + latest HumanMessage  → gemini-2.5-flash
+                   [history...] + latest HumanMessage  → gemini-3.8-flash
    │
    ▼
 response + telemetry (active_node, depth_level, fuzzy meta)

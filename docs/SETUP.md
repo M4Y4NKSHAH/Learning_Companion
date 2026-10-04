@@ -19,7 +19,7 @@
      ```powershell
      ollama create learning-companion -f training/Modelfile
      ```
-- A **Google AI (Gemini) API key** — optional cloud fallback. Without it the app runs completely offline via local Ollama or rule-based deterministic fallbacks.
+- A **Google AI (Gemini) API key** — optional cloud fallback (powered by Google's latest free model `gemini-3.8-flash`). Without it the app runs completely offline via local Ollama or rule-based deterministic fallbacks.
 
 Check versions:
 
