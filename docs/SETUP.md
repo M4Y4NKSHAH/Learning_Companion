@@ -9,8 +9,8 @@
 
 - **Python 3.11+** (a `venv/` already exists in the repo — Python 3.13)
 - **Node.js + npm** (required for the Vite frontend)
-- A **Google AI (Gemini) API key** — optional but strongly recommended. Without it the
-  app still runs using hardcoded fallback responses.
+- A **Google AI (Gemini) API key** — optional cloud fallback (powered by Google's flagship free model `gemini-3.8-flash`). Without it the
+  app still runs using hardcoded fallback responses and academic STEM blueprints.
 
 Check versions:
 

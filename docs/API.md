@@ -11,11 +11,12 @@
 | --- | --- | --- |
 | POST | `/api/material/ingest` | Ingest raw text/notes/syllabus into structured chapters, flashcards & tests |
 | POST | `/api/material/upload` | Upload PDF, TXT, or Markdown document for automated course generation |
+| POST | `/api/material/course/{course_id}/re-enrich` | Re-enrich existing course with updated blueprints or Gemini 3.8 Flash |
 | GET | `/api/material/courses` | List all available standard and custom ingested courses |
 | GET | `/api/material/course/{course_id}` | Retrieve full course outline, chapters, objectives and assessment items |
 | DELETE | `/api/material/course/{course_id}` | Delete a user-created custom course |
 | POST | `/api/tutor/load-theory` | Load cached/AI cards, quizzes & final exam (supports custom `course_id`) |
-| POST | `/api/tutor/generate-flashcards` | Force-generate Gemini RAG flashcards (max 3) |
+| POST | `/api/tutor/generate-flashcards` | Force-generate Gemini 3.8 Flash RAG flashcards (max 3) |
 | POST | `/api/tutor/chat` | LangGraph-routed adaptive tutor turn |
 | POST | `/api/tutor/evaluate-short-answer` | Grade free-text answer + produce sanitized Socratic hint |
 | POST | `/api/tutor/evaluate-exam` | Grade the timed final exam + remediation plan + analytics |

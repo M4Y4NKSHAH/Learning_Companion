@@ -1,7 +1,7 @@
 # 🧠 Learning Companion (AURA)
 
 > **Glass-Box Multi-Agent Socratic Tutoring Platform**  
-> Powered by FastAPI, LangGraph, Google Gemini, ChromaDB, and React (Japandi Design System).
+> Powered by FastAPI, LangGraph, Google Gemini (`gemini-3.8-flash`), ChromaDB Hybrid RAG, Local Ollama support, and React (Japandi Design System).
 
 ---
 
@@ -9,11 +9,13 @@
 
 **Learning Companion** is an intelligent, transparent educational platform designed to foster deep understanding through Socratic inquiry rather than passive answer retrieval.
 
-Unlike traditional "black-box" LLM tutors, Learning Companion exposes its reasoning and cognitive routing in real-time through a **Glass-Box UI**:
-- **Cognitive Routing Telemetry:** Watch the agent switch between *Surface Hinting*, *Deep Decomposition*, and *Direct Instruction*.
-- **Mamdani Fuzzy Inference System:** Multi-parameter evaluation that dynamically computes student mastery, error severity, response latency, and monotonic hint penalties.
-- **Textbook-Grounded RAG:** Ingests OpenStax textbooks and custom course materials into ChromaDB for factual, hallucination-free guidance.
-- **Japandi Aesthetic UI:** Minimalist, serene, and warm design engineered for calm, distraction-free study sessions.
+Unlike traditional "black-box" LLM tutors, Learning Companion exposes its reasoning and cognitive routing in real-time through a **Glass-Box Learning Dashboard**:
+- **Executive Learning Telemetry:** Intuitive student dashboard tracking Overall Mastery Score, AI Tutor State, Execution Pacing, and Problem Tenacity alongside an expandable Glass-Box diagnostics drawer.
+- **Mamdani Fuzzy Inference System:** Multi-parameter evaluation that dynamically computes student mastery, error severity, response latency, and monotonic hint penalties (validated against 10 ground-truth benchmark scenarios).
+- **Textbook-Grounded RAG & Domain Blueprints:** Ingests OpenStax textbooks and custom courses into ChromaDB with rigorous STEM blueprints covering Algebra, Calculus, Physics, Chemistry, and Computer Science.
+- **Evaluation Exam Scorecard:** Itemized question-by-question marks breakdown showing exact marks obtained (`X / Y Marks`, percentage score) and per-question pass/review status.
+- **Streamlined Japandi UI & Enhanced Typography:** Minimalist, warm washi-paper palette with elevated font sizing and a responsive, non-overlapping header layout designed for distraction-free study.
+- **User Authentication:** Integrated sign-up, sign-in, and session persistence with a user profile menu.
 
 ---
 
@@ -23,6 +25,7 @@ Unlike traditional "black-box" LLM tutors, Learning Companion exposes its reason
                   +-----------------------------------+
                   |        React + Vite Frontend      |
                   |     (Japandi Design System)       |
+                  |   Glass-Box Learning Dashboard    |
                   +-----------------+-----------------+
                                     |
                             HTTP / REST APIs
@@ -32,13 +35,22 @@ Unlike traditional "black-box" LLM tutors, Learning Companion exposes its reason
                   |        (backend/app.py)           |
                   +-----------------+-----------------+
                                     |
-       +----------------------------+----------------------------+
-       |                            |                            |
-+------v------+              +------v------+              +------v------+
-| LangGraph   |              | Mamdani     |              | ChromaDB    |
-| State       |              | Fuzzy       |              | Vector RAG  |
-| Machine     |              | Engine      |              | Storage     |
-+-------------+              +-------------+              +-------------+
+        +---------------------------+---------------------------+
+        |                           |                           |
++-------v-------+           +-------v-------+           +-------v-------+
+| LangGraph     |           | Mamdani Fuzzy |           | ChromaDB      |
+| Multi-Agent   |           | Marking Brain |           | Hybrid RAG    |
+| State Machine |           | (5 Parameters)|           | Ingestion     |
++-------+-------+           +-------+-------+           +---------------+
+        |                           |
+        +-------------+-------------+
+                      ▼
+        +---------------------------+
+        | Multi-Tier LLM Engine     |
+        | 1. Cloud Gemini 3.8 Flash |
+        | 2. Local Ollama (Offline) |
+        | 3. Grounded STEM Fallback |
+        +---------------------------+
 ```
 
 ---
@@ -79,11 +91,12 @@ Learning_Companion/
 │   └── data/                       # Textbooks, curriculum, and sample corpora
 ├── frontend/                       # React 18 + Vite + Tailwind CSS frontend
 │   ├── src/
-│   │   ├── components/             # Reusable UI modules (CourseStudio, TheoryExplorer, etc.)
-│   │   ├── App.jsx                 # Main application view & glass-box telemetry HUD
-│   │   └── index.css               # Japandi theme tokens & styling
+│   │   ├── components/             # Reusable UI modules (AuthModal, LandingPage, CourseStudio, TheoryExplorer, etc.)
+│   │   ├── lib/                    # Authentication helpers & session manager (auth.js)
+│   │   ├── App.jsx                 # Main application view & glass-box learning dashboard HUD
+│   │   └── index.css               # Japandi theme tokens & comfortable typography baseline
 │   └── package.json
-├── training/                       # Fine-tuning scripts (Llama-3.2 Unsloth Colab)
+├── training/                       # Fine-tuning scripts & model assets
 ├── requirements.txt                # Curated Python backend dependencies
 └── README.md
 ```
@@ -95,7 +108,7 @@ Learning_Companion/
 ### 1. Prerequisites
 - **Python:** 3.10+
 - **Node.js:** 18+ and npm
-- **API Key:** Google Gemini API Key
+- **API Key:** Google Gemini API Key (uses Google's flagship free model `gemini-3.8-flash`):
 
 Create a `.env` file in the project root:
 ```env
@@ -127,16 +140,19 @@ npm run dev
 
 ---
 
-## 🧪 Testing & Utilities
+## 🧪 Testing & Quality Assurance
 
 Run the automated test suites using Python:
 
 ```powershell
+# Run the 10-scenario ground-truth calibration test
+python backend/tests/test_10_scenarios.py
+
 # Run the Mamdani Fuzzy Marking benchmark suite
 python backend/tests/test_fuzzy_extended.py
 
-# Run the 10-scenario calibration test
-python backend/tests/test_10_scenarios.py
+# Run textbook ingestion & RAG pipeline verification
+python -m pytest backend/tests/test_ingestion_pipeline.py -v
 
 # Run interactive CLI evaluation tool
 python backend/scripts/evaluate_cli.py

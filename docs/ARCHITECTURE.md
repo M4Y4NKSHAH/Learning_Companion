@@ -15,16 +15,16 @@ The application is split into two processes that talk over HTTP:
 │        FRONTEND (Vite)      │          │         BACKEND (FastAPI)    │
 │  React 18 + Tailwind 3      │  HTTP    │  Port 127.0.0.1:8000        │
 │  Port 5173                  │ ───────► │  LangGraph · LangChain ·     │
-│                             │  JSON    │  Gemini 2.5 Flash · ChromaDB │
+│  Glass-Box Learning Dash    │  JSON    │  Gemini 3.8 Flash · ChromaDB │
 └─────────────────────────────┘          └──────────────────────────────┘
 ```
 
 - **Frontend** (`frontend/`) — React SPA. Renders the marketing **Landing Page**, then
-  the **Glass-Box Dashboard** (Study Deck, Practice Lab, Threshold Exam, chat). All
-  intelligence lives server-side; the UI only calls `/api/tutor/*`.
-- **Backend** (`backend/`) — FastAPI app exposing 5 tutor endpoints. It orchestrates a
+  the **Glass-Box Learning Dashboard** (Course Studio, Study Deck, Practice Lab, Evaluation Exam with marks scorecard, and Telemetry). All
+  intelligence lives server-side; the UI only calls `/api/tutor/*` and `/api/material/*`.
+- **Backend** (`backend/`) — FastAPI app exposing tutor and course material endpoints. It orchestrates a
   LangGraph state machine, a Mamdani-style fuzzy inference system, a ChromaDB vector
-  store, and the Gemini LLM to generate adaptive tutoring responses.
+  store, and the Gemini 3.8 Flash LLM to generate adaptive tutoring responses.
 
 ---
 
@@ -99,8 +99,9 @@ returns partial state updates which LangGraph merges.
 - Otherwise → `surface`
 
 ### Model config
-- LLM: `gemini-2.5-flash`
+- LLM: `gemini-3.8-flash` (or `gemini-flash-latest`)
 - Temperature varies by node: surface `0.3`, deep `0.2`, direct `0.1`
+- Content normalization: `normalize_ai_content()` unrolls multi-part list responses
 - API key from `GEMINI_API_KEY` or `GOOGLE_API_KEY` env var
 - Every node has a **hardcoded fallback** so the app still works offline
 
@@ -149,14 +150,20 @@ The same evaluator powers `/chat` routing, short-answer hints, and final-exam gr
 frontend/
 ├─ index.html                # Vite shell, loads Outfit font, #root
 ├─ vite.config.js            # port 5173, host: true
-├─ tailwind.config.js        # theme tokens
+├─ tailwind.config.js        # theme tokens & custom legible font scale
 ├─ postcss.config.js
 └─ src/
    ├─ main.jsx               # React root (StrictMode)
-   ├─ App.jsx                # Dashboard + app shell (single-file surface)
+   ├─ App.jsx                # Learning Dashboard + app shell (single-file surface)
    ├─ index.css              # Tailwind + washi-panel/halo/flip-card/animation utilities
+   ├─ lib/
+   │  └─ auth.js             # Session storage, user profile & auth helpers
    ├─ components/
+   │  ├─ AuthModal.jsx       # Sign-in / Sign-up dialog
+   │  ├─ WelcomeBackModal.jsx# Returning student prompt
    │  ├─ LandingPage.jsx     # Marketing page: hero, subjects/levels, modal, gallery
+   │  ├─ CourseStudioView.jsx# Course outline, chapters, and custom curriculum studio
+   │  ├─ TheoryExplorer.jsx  # Grounded mathematical derivations, axioms & worked examples
    │  └─ Reveal.jsx          # Scroll-triggered reveal wrapper
    └─ assets/                # heroImage.png + gallery1–5.png
 ```
@@ -164,9 +171,11 @@ frontend/
 ### Dashboard views (`App.jsx`)
 | View | Purpose |
 | --- | --- |
-| `Study Deck` | Flip-card flashcards (heuristic or Gemini-generated) |
-| `Practice Lab` | Quiz questions + free-answer text field → hint feedback loop |
-| `Threshold Exam` | Timed final exam → graded report with remediation plan |
+| `Course Studio` | Ingested textbooks, section outline, chapter overview & curriculum builder |
+| `Study Deck` | Flip-card flashcards (heuristic or Gemini 3.8 Flash generated) |
+| `Practice Lab` | Quiz questions + free-answer text field → sanitized Socratic hint feedback loop |
+| `Evaluation Exam` | Timed final exam → scorecard with total marks (`X / Y`), percentage, and per-question mark ledger |
+| `Dashboard & Telemetry` | Executive student learning KPIs (Mastery, Tutor State, Pacing, Tenacity) + expandable Glass-Box diagnostics |
 | Chat pane | Open-ended conversation driven by the LangGraph state machine |
 
 ---

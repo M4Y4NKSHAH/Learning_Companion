@@ -28,9 +28,11 @@ and subtle float animations ("drifting wash" orbs in the hero).
 | Panel | `rgba(250,246,239,.78)` + `backdrop-filter: blur(10px) saturate(105%)` | `.glass-panel` |
 | Panel border | `rgba(43,39,35,0.09)` ink hairline | `.glass-panel` border |
 | Shadow | `0 14px 34px -26px rgba(43,39,35,.28)` (soft ink) | `.glass-panel`, cards |
-| Font | `Outfit` (Google Fonts) + system-ui fallback | Entire app |
+| Font | `Outfit` (Google Fonts) + system-ui fallback; baseline `1rem / 1.65` line height | Entire app |
+| Font Scale | `xs: 13px`, `sm: 15px`, `base: 17px`, `lg: 19px`, `xl: 21px`, `2xl: 25px`, `3xl: 31px` | `tailwind.config.js` |
 | Corner radius | `rounded-xl` / `rounded-2xl` | Cards, buttons, panels |
 | Grid | 12-col for dashboard (`lg:grid-cols-12`) | App layout |
+| Navbar Header | Compact `py-2.5` profile with truncation guards and unified course selector | `App.jsx` sticky header |
 | Halo | `.glow-ember` `.glow-olive` `.glow-clay` (soft 18/44px halo @ 45%) | Active panels |
 | Ring | `ringColor.DEFAULT` = `ember-500` | Focus rings |
 | Focus | `:focus-visible` → 2px `rgba(165,98,58,.55)` outline, 2px offset | Keyboard nav |
