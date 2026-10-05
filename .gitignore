@@ -27,3 +27,13 @@ backend/data/courses/custom_*.json
 # System file logs
 *.log
 .DS_Store
+
+#Metadata Files
+API.md
+ARCHITECTURE.md
+DATA.md
+DESIGN.md
+LOCAL_MODEL_TRAINING_GUIDE.md
+MEMORY.md
+SETUP.md
+packages.txt
