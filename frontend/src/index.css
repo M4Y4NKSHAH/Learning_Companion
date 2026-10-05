@@ -4,6 +4,10 @@
 
 /* Core Application Reset Layer — Japandi "washi paper" surface */
 @layer base {
+  html {
+    font-size: 16px;
+    scroll-behavior: smooth;
+  }
   body {
     margin: 0;
     padding: 0;
@@ -17,6 +21,9 @@
     background-attachment: fixed;
     color: #2b2723; /* sand-100 ink */
     font-family: 'Outfit', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    font-size: 1rem;
+    line-height: 1.65;
+    letter-spacing: 0.01em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }

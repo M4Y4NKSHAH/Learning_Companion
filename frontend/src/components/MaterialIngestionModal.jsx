@@ -217,7 +217,7 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
               </p>
 
               {/* Live Elapsed Badge */}
-              <div className="flex items-center gap-2 mb-6 px-3.5 py-1.5 rounded-full bg-sand-950 border border-sand-800 text-[11px] font-mono text-sand-300">
+              <div className="flex items-center gap-2 mb-6 px-3.5 py-1.5 rounded-full bg-sand-950 border border-sand-800 text-xs font-mono text-sand-300">
                 <Clock className="w-3.5 h-3.5 text-clay-400 animate-pulse" />
                 <span>Elapsed: <strong className="text-sand-50">{elapsedSec}s</strong></span>
                 <span className="text-sand-600">•</span>
@@ -261,20 +261,20 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
                           )}
                         </div>
                         <div>
-                          <div className="text-xs font-semibold">{step.label}</div>
-                          <div className="text-[10px] text-sand-400">{step.desc}</div>
+                          <div className="text-sm font-semibold">{step.label}</div>
+                          <div className="text-xs text-sand-400">{step.desc}</div>
                         </div>
                       </div>
 
-                      {isDone && <span className="text-[10px] font-mono text-olive-400 font-bold">Done</span>}
-                      {isCurrent && <span className="text-[10px] font-mono text-clay-400 font-bold animate-pulse">In Progress...</span>}
+                      {isDone && <span className="text-xs font-mono text-olive-400 font-bold">Done</span>}
+                      {isCurrent && <span className="text-xs font-mono text-clay-400 font-bold animate-pulse">In Progress...</span>}
                     </div>
                   );
                 })}
               </div>
 
               {elapsedSec > 10 && !successCourse && (
-                <p className="text-[11px] text-sand-500 font-mono italic max-w-md">
+                <p className="text-xs text-sand-400 font-mono italic max-w-md">
                   💡 Processing extensive multi-page textbook/paper. Generating high-retention flashcards and embedding vector database...
                 </p>
               )}
@@ -323,7 +323,7 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
               {/* Title & Metadata Grid */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="md:col-span-3">
-                  <label className="block text-[11px] font-medium uppercase tracking-wider text-sand-400 mb-1">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-sand-300 mb-1.5">
                     Course / Topic Title *
                   </label>
                   <input
@@ -331,18 +331,18 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="e.g. Organic Chemistry Module 1, Classical Mechanics"
-                    className="w-full bg-sand-950 border border-sand-800 rounded-xl px-3.5 py-2 text-xs text-sand-50 placeholder-sand-500 focus:outline-none focus:border-clay-500"
+                    className="w-full bg-sand-950 border border-sand-800 rounded-xl px-3.5 py-2.5 text-sm text-sand-50 placeholder-sand-500 focus:outline-none focus:border-clay-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-medium uppercase tracking-wider text-sand-400 mb-1">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-sand-300 mb-1.5">
                     Subject Field
                   </label>
                   <select
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
-                    className="w-full bg-sand-950 border border-sand-800 rounded-xl px-3 py-2 text-xs text-sand-50 focus:outline-none focus:border-clay-500"
+                    className="w-full bg-sand-950 border border-sand-800 rounded-xl px-3 py-2.5 text-sm text-sand-50 focus:outline-none focus:border-clay-500"
                   >
                     {SUBJECT_OPTIONS.map((s) => (
                       <option key={s} value={s}>{s}</option>
@@ -351,13 +351,13 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-[11px] font-medium uppercase tracking-wider text-sand-400 mb-1">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-sand-300 mb-1.5">
                     Target Academic Level
                   </label>
                   <select
                     value={tier}
                     onChange={(e) => setTier(e.target.value)}
-                    className="w-full bg-sand-950 border border-sand-800 rounded-xl px-3 py-2 text-xs text-sand-50 focus:outline-none focus:border-clay-500"
+                    className="w-full bg-sand-950 border border-sand-800 rounded-xl px-3 py-2.5 text-sm text-sand-50 focus:outline-none focus:border-clay-500"
                   >
                     {TIER_OPTIONS.map((t) => (
                       <option key={t} value={t}>{t}</option>
@@ -369,7 +369,7 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
               {/* Source Document or Text Area */}
               {activeTab === 'upload' ? (
                 <div>
-                  <label className="block text-[11px] font-medium uppercase tracking-wider text-sand-400 mb-1">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-sand-300 mb-1.5">
                     Source Document (PDF, TXT, MD) *
                   </label>
                   <div
@@ -393,8 +393,8 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
                       <div className="flex items-center gap-3">
                         <FileCheck className="w-8 h-8 text-olive-400" />
                         <div className="text-left">
-                          <div className="text-xs font-semibold text-sand-50">{selectedFile.name}</div>
-                          <div className="text-[10px] text-olive-400">
+                          <div className="text-sm font-semibold text-sand-50">{selectedFile.name}</div>
+                          <div className="text-xs text-olive-400">
                             {(selectedFile.size / 1024).toFixed(1)} KB • Ready for extraction
                           </div>
                         </div>
@@ -402,15 +402,15 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
                     ) : (
                       <>
                         <Upload className="w-8 h-8 text-sand-400 mb-2" />
-                        <div className="text-xs font-medium text-sand-300">Click to browse or drag & drop document</div>
-                        <div className="text-[10px] text-sand-500 mt-0.5">PDF research papers, textbooks (.pdf), text (.txt), markdown (.md)</div>
+                        <div className="text-sm font-medium text-sand-200">Click to browse or drag & drop document</div>
+                        <div className="text-xs text-sand-400 mt-1">PDF research papers, textbooks (.pdf), text (.txt), markdown (.md)</div>
                       </>
                     )}
                   </div>
                 </div>
               ) : (
                 <div>
-                  <label className="block text-[11px] font-medium uppercase tracking-wider text-sand-400 mb-1">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-sand-300 mb-1.5">
                     Paste Lecture Notes, Syllabus, or Book Sections *
                   </label>
                   <textarea
@@ -418,9 +418,9 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
                     onChange={(e) => setRawText(e.target.value)}
                     rows={6}
                     placeholder="Paste lecture notes or chapter contents here... (e.g. Chapter 1: ..., Chapter 2: ...)"
-                    className="w-full bg-sand-950 border border-sand-800 rounded-xl p-3 text-xs text-sand-50 placeholder-sand-500 focus:outline-none focus:border-clay-500 font-mono"
+                    className="w-full bg-sand-950 border border-sand-800 rounded-xl p-3 text-sm text-sand-50 placeholder-sand-500 focus:outline-none focus:border-clay-500 font-mono"
                   />
-                  <div className="text-right text-[10px] text-sand-500 mt-1">{rawText.length} characters</div>
+                  <div className="text-right text-xs text-sand-400 mt-1">{rawText.length} characters</div>
                 </div>
               )}
 
@@ -429,15 +429,15 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-sand-400 hover:text-sand-50 hover:bg-sand-800 transition"
+                  className="px-4 py-2 rounded-xl text-sm font-semibold text-sand-400 hover:text-sand-50 hover:bg-sand-800 transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-clay-600 to-ember-600 hover:from-clay-500 hover:to-ember-500 shadow-lg shadow-sand-300/25 transition active:scale-95"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-clay-600 to-ember-600 hover:from-clay-500 hover:to-ember-500 shadow-lg shadow-sand-300/25 transition active:scale-95"
                 >
-                  <Sparkles className="w-3.5 h-3.5" />
+                  <Sparkles className="w-4 h-4" />
                   Process & Generate Course
                 </button>
               </div>

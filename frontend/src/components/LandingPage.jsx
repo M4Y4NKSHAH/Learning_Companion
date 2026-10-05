@@ -413,7 +413,7 @@ export default function LandingPage({ onSignUp, onNavigateSubject, onNavigateTie
             </div>
           </div>
           
-          <div className="flex flex-col md:flex-row justify-between items-center pt-8 border-t border-sand-900/50 gap-4 text-[10px] font-mono text-sand-600 uppercase tracking-widest">
+          <div className="flex flex-col md:flex-row justify-between items-center pt-8 border-t border-sand-900/50 gap-4 text-xs font-mono text-sand-500 uppercase tracking-widest">
             <span>© 2024 Aura Cognitive. All rights reserved.</span>
             <div className="flex gap-6">
               <a href="#" className="hover:text-sand-400">Privacy Policy</a>
@@ -444,16 +444,16 @@ export default function LandingPage({ onSignUp, onNavigateSubject, onNavigateTie
               <div className="bg-gradient-to-tr from-ember-600 to-clay-600 p-2.5 rounded-xl">
                 <BrainCircuit className="w-5 h-5 text-white" />
               </div>
-              <h3 className="text-lg font-bold text-sand-50">Choose Your Learning Path</h3>
+              <h3 className="text-xl font-bold text-sand-50">Choose Your Learning Path</h3>
             </div>
-            <p className="text-xs text-sand-400 mb-6">
+            <p className="text-sm text-sand-400 mb-6">
               Select your subject and class to launch your personalized Aura dashboard.
             </p>
 
             <div className="space-y-5">
               {/* SUBJECT SELECTION */}
               <div>
-                <span className="text-[10px] font-mono uppercase tracking-widest text-sand-500 block mb-2">Subject</span>
+                <span className="text-xs font-mono uppercase tracking-widest text-sand-400 block mb-2">Subject</span>
                 <div className="grid grid-cols-3 gap-2">
                   {subjects.map(s => (
                     <button
@@ -471,7 +471,7 @@ export default function LandingPage({ onSignUp, onNavigateSubject, onNavigateTie
 
               {/* TIER SELECTION */}
               <div>
-                <span className="text-[10px] font-mono uppercase tracking-widest text-sand-500 block mb-2">Class / Academic Level</span>
+                <span className="text-xs font-mono uppercase tracking-widest text-sand-400 block mb-2">Class / Academic Level</span>
                 <div className="grid grid-cols-3 gap-2">
                   {levels.map(l => (
                     <button

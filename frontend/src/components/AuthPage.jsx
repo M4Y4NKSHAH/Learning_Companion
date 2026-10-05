@@ -183,7 +183,7 @@ export default function AuthPage({ onBack, onAuthenticated }) {
                   className="w-full bg-sand-950 border border-sand-800 rounded-xl px-3.5 py-2.5 text-sm text-sand-50 placeholder-sand-500 focus:border-ember-500 focus:outline-none focus:ring-1 focus:ring-ember-500/40 transition-colors"
                   required
                 />
-                {nameError && <p className="mt-1.5 text-[11px] text-clay-400">{nameError}</p>}
+                {nameError && <p className="mt-1.5 text-xs text-clay-400">{nameError}</p>}
               </div>
             )}
 
@@ -200,7 +200,7 @@ export default function AuthPage({ onBack, onAuthenticated }) {
                   required
                 />
               </div>
-              {usernameError && <p className="mt-1.5 text-[11px] text-clay-400">{usernameError}</p>}
+              {usernameError && <p className="mt-1.5 text-xs text-clay-400">{usernameError}</p>}
             </div>
 
             <div>
@@ -224,7 +224,7 @@ export default function AuthPage({ onBack, onAuthenticated }) {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              {passwordError && <p className="mt-1.5 text-[11px] text-clay-400">{passwordError}</p>}
+              {passwordError && <p className="mt-1.5 text-xs text-clay-400">{passwordError}</p>}
             </div>
 
             {mode === 'sign-up' && (
@@ -249,7 +249,7 @@ export default function AuthPage({ onBack, onAuthenticated }) {
                     {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                {confirmError && <p className="mt-1.5 text-[11px] text-clay-400">{confirmError}</p>}
+                {confirmError && <p className="mt-1.5 text-xs text-clay-400">{confirmError}</p>}
               </div>
             )}
 
@@ -293,7 +293,7 @@ export default function AuthPage({ onBack, onAuthenticated }) {
           {/* Dev convenience: pick a locally-stored account */}
           {mode === 'sign-in' && accounts.length > 0 && (
             <div className="mt-6 pt-5 border-t border-sand-800">
-              <p className="text-[10px] text-sand-500 uppercase font-semibold tracking-wider mb-2">
+              <p className="text-xs text-sand-400 uppercase font-semibold tracking-wider mb-2">
                 Local accounts on this device
               </p>
               <div className="space-y-1.5">
@@ -301,7 +301,7 @@ export default function AuthPage({ onBack, onAuthenticated }) {
                   <button
                     key={entry.username}
                     onClick={() => useExistingAccount(entry)}
-                    className="w-full text-left p-2 rounded-xl border border-sand-800 bg-sand-900/40 hover:bg-sand-900 text-xs text-sand-300 hover:text-sand-50 transition-colors"
+                    className="w-full text-left p-2.5 rounded-xl border border-sand-800 bg-sand-900/40 hover:bg-sand-900 text-sm text-sand-300 hover:text-sand-50 transition-colors"
                   >
                     <span className="font-medium">{entry.username}</span>
                     {entry.name && <span className="text-sand-500"> — {entry.name}</span>}
@@ -311,7 +311,7 @@ export default function AuthPage({ onBack, onAuthenticated }) {
             </div>
           )}
 
-          <p className="mt-6 text-[10px] text-sand-500 text-center leading-relaxed">
+          <p className="mt-6 text-xs text-sand-400 text-center leading-relaxed">
             Accounts are stored <strong>device-locally</strong> in cookies. This is a demo gate
             for a class project — never sign up with a real password.
           </p>

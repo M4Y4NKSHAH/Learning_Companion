@@ -10,18 +10,18 @@ export default function ChapterNav({
   if (!chapters || chapters.length <= 1) return null;
 
   return (
-    <div className="glass-panel p-3 rounded-2xl mb-5 border border-sand-800">
-      <div className="flex items-center justify-between mb-2.5 px-1">
-        <div className="flex items-center gap-2">
+    <div className="glass-panel p-4 rounded-2xl mb-6 border border-sand-800">
+      <div className="flex items-center justify-between mb-3 px-1">
+        <div className="flex items-center gap-2.5">
           <Layers className={`w-4 h-4 text-${activeColor}-400`} />
-          <span className="text-[11px] font-bold uppercase tracking-wider text-sand-300">
+          <span className="text-xs font-bold uppercase tracking-wider text-sand-300">
             Curriculum Chapters ({chapters.length})
           </span>
         </div>
         {activeChapterIndex !== null && (
           <button
             onClick={() => onSelectChapter(null)}
-            className="text-[10px] text-sand-400 hover:text-sand-200 transition font-medium underline underline-offset-2"
+            className="text-xs text-sand-400 hover:text-sand-200 transition font-medium underline underline-offset-2"
           >
             View All Chapters
           </button>
@@ -32,13 +32,13 @@ export default function ChapterNav({
       <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar">
         <button
           onClick={() => onSelectChapter(null)}
-          className={`flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
+          className={`flex-shrink-0 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-2 ${
             activeChapterIndex === null
               ? 'bg-sand-200 text-sand-900 shadow-md font-bold'
               : 'bg-sand-800/80 text-sand-400 hover:text-sand-200 hover:bg-sand-800'
           }`}
         >
-          <BookOpen className="w-3 h-3" />
+          <BookOpen className="w-3.5 h-3.5" />
           <span>Complete Course</span>
         </button>
 
@@ -51,14 +51,14 @@ export default function ChapterNav({
             <button
               key={ch.chapter_id || idx}
               onClick={() => onSelectChapter(idx)}
-              className={`flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 border ${
+              className={`flex-shrink-0 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-2 border ${
                 isSelected
                   ? 'bg-clay-600 border-clay-500 text-white shadow-md shadow-sand-300/25'
                   : 'bg-sand-900/60 border-sand-800 text-sand-300 hover:text-sand-50 hover:border-sand-700'
               }`}
             >
-              <span className="text-[10px] opacity-75 font-mono">Ch.{chNum}</span>
-              <span className="max-w-[140px] truncate">{title}</span>
+              <span className="text-xs opacity-80 font-mono">Ch.{chNum}</span>
+              <span className="max-w-[160px] truncate">{title}</span>
             </button>
           );
         })}
@@ -66,8 +66,8 @@ export default function ChapterNav({
 
       {/* Selected Chapter Quick Preview */}
       {activeChapterIndex !== null && chapters[activeChapterIndex] && (
-        <div className="mt-2.5 pt-2.5 border-t border-sand-800/80 px-1 text-xs text-sand-300 flex items-start gap-2 animate-fadeIn">
-          <Sparkles className="w-3.5 h-3.5 text-clay-400 flex-shrink-0 mt-0.5" />
+        <div className="mt-3 pt-3 border-t border-sand-800/80 px-1 text-sm text-sand-300 flex items-start gap-2 animate-fadeIn">
+          <Sparkles className="w-4 h-4 text-clay-400 flex-shrink-0 mt-0.5" />
           <div>
             <span className="font-semibold text-sand-50">
               {chapters[activeChapterIndex].title}:{' '}

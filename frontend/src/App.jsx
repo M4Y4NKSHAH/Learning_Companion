@@ -38,7 +38,10 @@ import {
   Check,
   FolderOpen,
   LogOut,
-  User
+  User,
+  ChevronDown,
+  Cpu,
+  Award
 } from 'lucide-react';
 
 /** Lightweight markdown renderer for tutor hints (headers, bullets, bold). */
@@ -83,13 +86,13 @@ function HintMarkdown({ text, className = '' }) {
 
     if (line.startsWith('### ')) {
       flushList();
-      blocks.push(<h5 key={lineIdx} className="font-bold text-[11px] mt-2 mb-1 text-sand-200">{formatInlineMarkdown(line.slice(4))}</h5>);
+      blocks.push(<h5 key={lineIdx} className="font-bold text-xs mt-2.5 mb-1 text-sand-200">{formatInlineMarkdown(line.slice(4))}</h5>);
     } else if (line.startsWith('## ')) {
       flushList();
-      blocks.push(<h4 key={lineIdx} className="font-bold text-xs mt-2 mb-1 text-sand-100">{formatInlineMarkdown(line.slice(3))}</h4>);
+      blocks.push(<h4 key={lineIdx} className="font-bold text-sm mt-3 mb-1 text-sand-100">{formatInlineMarkdown(line.slice(3))}</h4>);
     } else if (line.startsWith('# ')) {
       flushList();
-      blocks.push(<h3 key={lineIdx} className="font-bold text-sm mt-2 mb-1">{formatInlineMarkdown(line.slice(2))}</h3>);
+      blocks.push(<h3 key={lineIdx} className="font-bold text-base mt-3.5 mb-1.5">{formatInlineMarkdown(line.slice(2))}</h3>);
     } else if (/^[-*]\s+/.test(line)) {
       if (listType && listType !== 'unordered') flushList();
       listType = 'unordered';
@@ -100,12 +103,12 @@ function HintMarkdown({ text, className = '' }) {
       listItems.push(line.replace(/^\d+\.\s+/, ''));
     } else {
       flushList();
-      blocks.push(<p key={lineIdx} className="leading-relaxed">{formatInlineMarkdown(line)}</p>);
+      blocks.push(<p key={lineIdx} className="leading-relaxed text-sm">{formatInlineMarkdown(line)}</p>);
     }
   });
   flushList();
 
-  return <div className={`space-y-1 ${className}`}>{blocks}</div>;
+  return <div className={`space-y-1.5 ${className}`}>{blocks}</div>;
 }
 
 const FALLBACK_CURRICULUM = {
@@ -668,6 +671,7 @@ export default function App() {
   const [allCourses, setAllCourses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showBenchmarkModal, setShowBenchmarkModal] = useState(false);
+  const [showGlassBoxDetails, setShowGlassBoxDetails] = useState(false);
 
   const handleSimulateScenario = (sc) => {
     setMamdaniDefuzzifiedScore(sc.centroid);
@@ -1291,75 +1295,75 @@ export default function App() {
             <BrainCircuit className="w-5 h-5 text-white" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-sm font-bold tracking-tight bg-gradient-to-r from-sand-50 to-sand-400 bg-clip-text text-transparent whitespace-nowrap">
+            <h1 className="text-base sm:text-lg font-bold tracking-tight bg-gradient-to-r from-sand-50 to-sand-400 bg-clip-text text-transparent whitespace-nowrap">
               {activeCourseTitle || 'AURA LEARNING COMPANION'}
             </h1>
-            <p className="text-[10px] text-sand-500 font-mono uppercase tracking-widest hidden sm:block">
+            <p className="text-xs text-sand-500 font-mono uppercase tracking-wider hidden sm:block">
               {selectedCourseId ? 'Custom Ingested Course' : `${activeSubject} • ${activeTier}`}
             </p>
           </div>
         </div>
 
         {/* PAGE NAVIGATION TABS (DESKTOP) */}
-        <div className="hidden lg:flex items-center bg-sand-900/80 p-1 rounded-xl border border-sand-800 shadow-inner">
+        <div className="hidden lg:flex items-center bg-sand-900/80 p-1.5 rounded-2xl border border-sand-800 shadow-inner gap-1">
           <button
             onClick={() => setActiveView('studio')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
               activeView === 'studio'
                 ? 'bg-clay-600 text-white shadow-md shadow-sand-300/25'
                 : 'text-sand-400 hover:text-sand-200 hover:bg-sand-800/50'
             }`}
           >
-            <Layers className="w-3.5 h-3.5" />
+            <Layers className="w-4 h-4" />
             <span>Course Studio</span>
           </button>
 
           <button
             onClick={() => setActiveView('theory')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
               activeView === 'theory'
                 ? 'bg-clay-600 text-white shadow-md shadow-sand-300/25'
                 : 'text-sand-400 hover:text-sand-200 hover:bg-sand-800/50'
             }`}
           >
-            <BookOpen className="w-3.5 h-3.5" />
+            <BookOpen className="w-4 h-4" />
             <span>Study Deck</span>
           </button>
 
           <button
             onClick={() => setActiveView('quiz')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
               activeView === 'quiz'
                 ? 'bg-olive-600 text-white shadow-md shadow-sand-300/25'
                 : 'text-sand-400 hover:text-sand-200 hover:bg-sand-800/50'
             }`}
           >
-            <HelpCircle className="w-3.5 h-3.5" />
+            <HelpCircle className="w-4 h-4" />
             <span>Practice Lab</span>
           </button>
 
           <button
             onClick={() => setActiveView('final_exam')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
               activeView === 'final_exam'
                 ? 'bg-ember-600 text-white shadow-md shadow-sand-300/25'
                 : 'text-sand-400 hover:text-sand-200 hover:bg-sand-800/50'
             }`}
           >
-            <Bookmark className="w-3.5 h-3.5" />
+            <Bookmark className="w-4 h-4" />
             <span>Evaluation Exam</span>
           </button>
 
           <button
             onClick={() => setActiveView('telemetry')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
               activeView === 'telemetry'
                 ? 'bg-sand-800 text-clay-300 border border-clay-500/30 shadow-md'
                 : 'text-sand-400 hover:text-sand-200 hover:bg-sand-800/50'
             }`}
           >
-            <Activity className="w-3.5 h-3.5" />
-            <span>Telemetry</span>
+            <Activity className="w-4 h-4" />
+            <span>Dashboard & Telemetry</span>
           </button>
         </div>
 
@@ -1367,9 +1371,9 @@ export default function App() {
         <div className="hidden md:flex items-center justify-end gap-3">
           {/* Signed-in user indicator + sign-out */}
           {session && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-sand-800 bg-sand-900/60">
-              <User className="w-3.5 h-3.5 text-sand-400" />
-              <span className="text-xs text-sand-300">{session.name || session.username}</span>
+            <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-sand-800 bg-sand-900/60">
+              <User className="w-4 h-4 text-sand-400" />
+              <span className="text-sm font-medium text-sand-300">{session.name || session.username}</span>
               <button
                 type="button"
                 onClick={handleSignOut}
@@ -1377,7 +1381,7 @@ export default function App() {
                 aria-label="Sign out"
                 title="Sign out"
               >
-                <LogOut className="w-3.5 h-3.5" />
+                <LogOut className="w-4 h-4" />
               </button>
             </div>
           )}
@@ -1393,7 +1397,7 @@ export default function App() {
                   if (found) handleSelectCustomCourse(found);
                 }
               }}
-              className="bg-sand-900 border border-clay-500/30 text-clay-300 text-xs px-3 py-1.5 rounded-xl focus:outline-none focus:border-clay-500 font-semibold"
+              className="bg-sand-900 border border-clay-500/30 text-clay-300 text-sm px-3.5 py-2 rounded-xl focus:outline-none focus:border-clay-500 font-semibold"
             >
               <option value="">Default Standard Subjects</option>
               {customCourses.map(c => (
@@ -1405,12 +1409,12 @@ export default function App() {
           )}
 
           {!selectedCourseId && (
-            <div className="flex bg-sand-900/60 p-1 rounded-xl border border-sand-800">
+            <div className="flex bg-sand-900/60 p-1.5 rounded-xl border border-sand-800 gap-1">
               {['Physics', 'Biology', 'Mathematics'].map(sub => (
                 <button 
                   key={sub} 
                   onClick={() => { handleResetToStandardCourse(sub, activeTier); }} 
-                  className={`text-xs px-3 py-1 rounded-lg font-semibold transition-all ${activeSubject === sub ? 'bg-sand-800 text-sand-50 shadow-sm border border-sand-700' : 'text-sand-400 hover:text-sand-200'}`}
+                  className={`text-sm px-3.5 py-1.5 rounded-lg font-semibold transition-all ${activeSubject === sub ? 'bg-sand-800 text-sand-50 shadow-sm border border-sand-700' : 'text-sand-400 hover:text-sand-200'}`}
                 >
                   {sub}
                 </button>
@@ -1420,9 +1424,9 @@ export default function App() {
 
           <button
             onClick={() => setIsIngestionModalOpen(true)}
-            className="bg-gradient-to-r from-clay-600 via-amber-600 to-ember-600 hover:from-clay-500 hover:to-ember-500 text-white text-xs font-bold px-3.5 py-1.5 rounded-xl shadow-lg shadow-sand-300/25 transition-all flex items-center gap-1.5 border border-clay-400/30 active:scale-95"
+            className="bg-gradient-to-r from-clay-600 via-amber-600 to-ember-600 hover:from-clay-500 hover:to-ember-500 text-white text-sm font-bold px-4 py-2 rounded-xl shadow-lg shadow-sand-300/25 transition-all flex items-center gap-2 border border-clay-400/30 active:scale-95"
           >
-            <Plus className="w-3.5 h-3.5 text-yellow-300" />
+            <Plus className="w-4 h-4 text-yellow-300" />
             <span>Ingest Material</span>
           </button>
         </div>
@@ -1444,7 +1448,7 @@ export default function App() {
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => { setActiveView('studio'); setMobileHeaderOpen(false); }}
-              className={`p-2.5 rounded-xl text-xs font-bold flex items-center gap-2 border ${
+              className={`p-3 rounded-xl text-sm font-bold flex items-center gap-2 border ${
                 activeView === 'studio' ? 'bg-clay-600 text-white border-clay-500' : 'bg-sand-900 text-sand-300 border-sand-800'
               }`}
             >
@@ -1452,7 +1456,7 @@ export default function App() {
             </button>
             <button
               onClick={() => { setActiveView('theory'); setMobileHeaderOpen(false); }}
-              className={`p-2.5 rounded-xl text-xs font-bold flex items-center gap-2 border ${
+              className={`p-3 rounded-xl text-sm font-bold flex items-center gap-2 border ${
                 activeView === 'theory' ? 'bg-clay-600 text-white border-clay-500' : 'bg-sand-900 text-sand-300 border-sand-800'
               }`}
             >
@@ -1460,7 +1464,7 @@ export default function App() {
             </button>
             <button
               onClick={() => { setActiveView('quiz'); setMobileHeaderOpen(false); }}
-              className={`p-2.5 rounded-xl text-xs font-bold flex items-center gap-2 border ${
+              className={`p-3 rounded-xl text-sm font-bold flex items-center gap-2 border ${
                 activeView === 'quiz' ? 'bg-olive-600 text-white border-olive-500' : 'bg-sand-900 text-sand-300 border-sand-800'
               }`}
             >
@@ -1468,7 +1472,7 @@ export default function App() {
             </button>
             <button
               onClick={() => { setActiveView('final_exam'); setMobileHeaderOpen(false); }}
-              className={`p-2.5 rounded-xl text-xs font-bold flex items-center gap-2 border ${
+              className={`p-3 rounded-xl text-sm font-bold flex items-center gap-2 border ${
                 activeView === 'final_exam' ? 'bg-ember-600 text-white border-ember-500' : 'bg-sand-900 text-sand-300 border-sand-800'
               }`}
             >
@@ -1476,12 +1480,12 @@ export default function App() {
             </button>
             <button
               onClick={() => { setActiveView('telemetry'); setMobileHeaderOpen(false); }}
-              className={`col-span-2 p-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border ${
+              className={`col-span-2 p-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 border ${
                 activeView === 'telemetry' ? 'bg-sand-800 text-clay-300 border-clay-500' : 'bg-sand-900 text-sand-300 border-sand-800'
               }`}
             >
-              <Activity className="w-4 h-4" /> Glass-Box Telemetry
-                        </button>
+              <Activity className="w-4 h-4" /> Dashboard & Telemetry
+            </button>
           </div>
 
           {session && (
@@ -1537,39 +1541,39 @@ export default function App() {
             {currentQuestion ? (
               <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-sand-800 shadow-2xl space-y-5">
                 {/* Header */}
-                <div className="border-b border-sand-800 pb-4 flex justify-between items-center flex-wrap gap-2">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2 bg-olive-500/20 rounded-xl text-olive-400 border border-olive-500/30">
-                      <HelpCircle className="w-4 h-4" />
+                <div className="border-b border-sand-800 pb-4 flex justify-between items-center flex-wrap gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-olive-500/20 rounded-xl text-olive-400 border border-olive-500/30">
+                      <HelpCircle className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-sand-50">Interactive Socratic Practice Lab</h3>
-                      <span className="text-[11px] text-olive-400 font-mono">Concept: {currentQuestion.concept}</span>
+                      <h3 className="text-base font-bold text-sand-50">Interactive Socratic Practice Lab</h3>
+                      <span className="text-xs text-olive-400 font-mono font-semibold">Concept: {currentQuestion.concept}</span>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2">
                     {mockErrors >= 2 && (
-                      <span className="text-[10px] font-mono text-amber-800 border border-amber-500/40 px-2.5 py-1 rounded-full bg-amber-500/10 flex items-center gap-1">
-                        <Zap className="w-3 h-3 text-amber-800 animate-pulse" />
+                      <span className="text-xs font-mono text-amber-800 border border-amber-500/40 px-3 py-1 rounded-full bg-amber-500/10 flex items-center gap-1.5">
+                        <Zap className="w-3.5 h-3.5 text-amber-800 animate-pulse" />
                         Direct Solution Threshold Active
                       </span>
                     )}
-                    <span className="text-[10px] font-mono text-olive-400 border border-olive-500/30 px-3 py-1 rounded-full bg-olive-500/10 flex items-center gap-1.5">
-                      <Sparkles className="w-3 h-3 text-olive-400 animate-pulse" />
+                    <span className="text-xs font-mono text-olive-400 border border-olive-500/30 px-3 py-1 rounded-full bg-olive-500/10 flex items-center gap-1.5 font-medium">
+                      <Sparkles className="w-3.5 h-3.5 text-olive-400 animate-pulse" />
                       Adaptive Depth Socratic Tutor
                     </span>
                   </div>
                 </div>
 
                 {/* Concept Question Banner */}
-                <div className="bg-gradient-to-r from-sand-950 via-sand-900 to-olive-950/30 border border-sand-800 p-5 rounded-2xl border-l-4 border-l-olive-500 shadow-lg">
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-olive-400 font-bold">
+                <div className="bg-gradient-to-r from-sand-950 via-sand-900 to-olive-950/30 border border-sand-800 p-6 rounded-2xl border-l-4 border-l-olive-500 shadow-lg space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-mono uppercase tracking-wider text-olive-400 font-bold">
                       Active Problem Statement
                     </span>
                     {quizzes.length > 1 && (
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1.5">
                         {quizzes.map((q, qIdx) => (
                           <button
                             key={q.id || qIdx}
@@ -1578,9 +1582,9 @@ export default function App() {
                               setChatLog([]);
                               setMockErrors(0);
                             }}
-                            className={`text-[9px] font-mono px-2 py-0.5 rounded-md border transition-all ${
+                            className={`text-xs font-mono px-3 py-1 rounded-lg border transition-all ${
                               currentQuestion?.id === q.id
-                                ? 'bg-olive-500/20 border-olive-500/50 text-olive-300 font-bold'
+                                ? 'bg-olive-500/20 border-olive-500/50 text-olive-300 font-bold shadow-sm'
                                 : 'bg-sand-900/80 border-sand-800 text-sand-400 hover:text-sand-200'
                             }`}
                           >
@@ -1590,38 +1594,38 @@ export default function App() {
                       </div>
                     )}
                   </div>
-                  <p className="text-sm text-sand-100 font-semibold leading-relaxed">{currentQuestion.text}</p>
+                  <p className="text-base text-sand-100 font-semibold leading-relaxed pt-1">{currentQuestion.text}</p>
                 </div>
 
                 {/* Conversation Log */}
-                <div className="h-[360px] overflow-y-auto space-y-4 custom-scrollbar p-3 bg-sand-950/60 rounded-2xl border border-sand-900">
+                <div className="h-[380px] overflow-y-auto space-y-4 custom-scrollbar p-4 bg-sand-950/60 rounded-2xl border border-sand-900">
                   {chatLog.length === 0 ? (
-                    <div className="text-sand-400 text-xs text-center pt-24 space-y-2">
-                      <p className="font-semibold text-sand-300">Ask a question, propose a solution, or test your intuition...</p>
-                      <p className="text-[11px] text-sand-600 font-mono">
+                    <div className="text-sand-400 text-sm text-center pt-28 space-y-2 max-w-md mx-auto">
+                      <p className="font-semibold text-sand-200 text-base">Ask a question, propose a solution, or test your intuition...</p>
+                      <p className="text-xs text-sand-500 font-mono leading-relaxed">
                         The tutor adapts to surface intuition, mathematical steps, or remedial guidance based on your responses.
                       </p>
                     </div>
                   ) : (
                     chatLog.map((chat, idx) => (
                       <div key={idx} className={`flex w-full ${chat.sender === 'student' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[85%] text-xs p-4 rounded-2xl border shadow-lg ${
+                        <div className={`max-w-[85%] text-sm p-4 sm:p-5 rounded-2xl border shadow-lg ${
                           chat.sender === 'student' 
                             ? 'bg-gradient-to-r from-ember-900/40 to-amber-900/40 border-ember-500/30 text-ember-100 rounded-br-none' 
                             : 'bg-gradient-to-br from-sand-900 via-sand-950 to-olive-950/30 border-sand-800 text-sand-200 rounded-bl-none'
                         }`}>
-                          <div className="flex items-center justify-between gap-2 border-b border-sand-800/60 pb-2 mb-2">
-                            <span className="text-[10px] font-mono text-sand-400 font-bold uppercase tracking-widest">
+                          <div className="flex items-center justify-between gap-2 border-b border-sand-800/60 pb-2.5 mb-2.5">
+                            <span className="text-xs font-mono text-sand-400 font-bold uppercase tracking-wider">
                               {chat.sender === 'student' ? 'Student Input' : 'Socratic Tutor Response'}
                             </span>
                             {chat.sender !== 'student' && (
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-2">
                                 {chat.mamdani && (
-                                  <span className="text-[9px] font-mono text-olive-400 bg-olive-950/40 border border-olive-500/30 px-1.5 py-0.5 rounded">
+                                  <span className="text-xs font-mono text-olive-400 bg-olive-950/40 border border-olive-500/30 px-2 py-0.5 rounded-md font-semibold">
                                     FIS: {Math.round(chat.mamdani.fuzzy_score)}%
                                   </span>
                                 )}
-                                <span className={`text-[9px] font-mono px-2.5 py-0.5 rounded-full border ${
+                                <span className={`text-xs font-mono px-3 py-0.5 rounded-full border font-semibold ${
                                   chat.depth === 'deep' 
                                     ? 'bg-clay-950/60 border-clay-500/40 text-clay-300'
                                     : (chat.depth === 'solution' || chat.depth === 'remedial')
@@ -1644,32 +1648,32 @@ export default function App() {
 
                 {/* Quick Inquiry Chips */}
                 <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-1 text-xs font-mono">
-                  <span className="text-sand-500 text-[11px] whitespace-nowrap">Suggested Prompts:</span>
+                  <span className="text-sand-500 text-xs font-semibold whitespace-nowrap">Suggested Prompts:</span>
                   <button
                     onClick={() => submitQuizAnswer("Can you give me a hint for this question?", "hint")}
                     disabled={loading}
-                    className="bg-olive-950/80 hover:bg-olive-900/80 border border-olive-500/40 px-3 py-1.5 rounded-full text-olive-300 whitespace-nowrap transition flex items-center gap-1 font-semibold shadow-sm"
+                    className="bg-olive-950/80 hover:bg-olive-900/80 border border-olive-500/40 px-3.5 py-1.5 rounded-full text-olive-300 whitespace-nowrap transition flex items-center gap-1.5 text-xs font-semibold shadow-sm"
                   >
                     💡 Request a Hint
                   </button>
                   <button
                     onClick={() => submitQuizAnswer("Explain the core intuitive concept simply with a real-world example.", "discussion")}
                     disabled={loading}
-                    className="bg-sand-900 hover:bg-sand-800 border border-sand-800 px-3 py-1.5 rounded-full text-amber-800 whitespace-nowrap transition"
+                    className="bg-sand-900 hover:bg-sand-800 border border-sand-800 px-3.5 py-1.5 rounded-full text-amber-800 whitespace-nowrap transition text-xs font-semibold"
                   >
                     🌱 Core Intuition
                   </button>
                   <button
                     onClick={() => submitQuizAnswer("Show the step-by-step formula derivation and mathematical relationship.", "discussion")}
                     disabled={loading}
-                    className="bg-sand-900 hover:bg-sand-800 border border-sand-800 px-3 py-1.5 rounded-full text-clay-300 whitespace-nowrap transition"
+                    className="bg-sand-900 hover:bg-sand-800 border border-sand-800 px-3.5 py-1.5 rounded-full text-clay-300 whitespace-nowrap transition text-xs font-semibold"
                   >
                     🔮 Formula Steps
                   </button>
                   <button
                     onClick={() => submitQuizAnswer("give me the answer please and show full solution", "solution")}
                     disabled={loading}
-                    className="bg-amber-500/10 hover:bg-amber-500/10 border border-amber-500/40 px-3 py-1.5 rounded-full text-amber-800 whitespace-nowrap transition flex items-center gap-1 font-semibold"
+                    className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 px-3.5 py-1.5 rounded-full text-amber-800 whitespace-nowrap transition flex items-center gap-1.5 text-xs font-semibold"
                   >
                     ⚡ Unlock Full Solution
                   </button>
@@ -1684,19 +1688,19 @@ export default function App() {
                     onKeyDown={(e) => e.key === 'Enter' && submitQuizAnswer()} 
                     placeholder="Type your question or answer here..." 
                     disabled={loading}
-                    className="flex-1 bg-sand-950 border border-sand-800 rounded-xl px-4 py-3 text-xs text-sand-100 focus:outline-none focus:border-olive-500 transition font-mono placeholder:text-sand-600"
+                    className="flex-1 bg-sand-950 border border-sand-800 rounded-2xl px-4 py-3 text-sm text-sand-100 focus:outline-none focus:border-olive-500 transition font-mono placeholder:text-sand-600"
                   />
                   <button 
                     onClick={() => submitQuizAnswer()} 
                     disabled={loading || !studentAnswer.trim()}
-                    className="bg-gradient-to-r from-olive-600 to-amber-600 hover:from-olive-500 hover:to-amber-500 text-white font-bold px-6 rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-sand-300/25 transition disabled:opacity-40 flex items-center gap-2"
+                    className="bg-gradient-to-r from-olive-600 to-amber-600 hover:from-olive-500 hover:to-amber-500 text-white font-bold px-7 py-3 rounded-2xl text-sm uppercase tracking-wider shadow-lg shadow-sand-300/25 transition disabled:opacity-40 flex items-center gap-2"
                   >
                     {loading ? (
                       <div className="w-4 h-4 border-2 border-white/35 border-t-white rounded-full animate-spin" />
                     ) : (
                       <>
                         <span>Submit</span>
-                        <Send className="w-3.5 h-3.5" />
+                        <Send className="w-4 h-4" />
                       </>
                     )}
                   </button>
@@ -1719,21 +1723,21 @@ export default function App() {
                   <div className="space-y-6">
                     {/* Header */}
                     <div className="flex justify-between items-center border-b border-sand-800 pb-4">
-                      <div className="flex items-center gap-2.5">
-                        <div className="p-2 bg-ember-500/20 rounded-xl text-ember-400 border border-ember-500/30">
-                          <Bookmark className="w-4 h-4" />
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-ember-500/20 rounded-xl text-ember-400 border border-ember-500/30">
+                          <Bookmark className="w-5 h-5" />
                         </div>
                         <div>
-                          <h3 className="text-sm font-bold text-sand-50">Threshold Final Evaluation</h3>
-                          <span className="text-[11px] text-clay-400 font-mono font-semibold">
+                          <h3 className="text-base font-bold text-sand-50">Threshold Final Evaluation</h3>
+                          <span className="text-xs text-clay-400 font-mono font-semibold">
                             {finalExams[activeExamQuestionIndex]?.moduleOrigin}
                           </span>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3 text-xs font-mono">
+                      <div className="flex items-center gap-3 text-sm font-mono">
                         <span className="text-sand-400">Question {activeExamQuestionIndex + 1} of {finalExams.length}</span>
-                        <span className="text-sand-300 font-bold flex items-center gap-1.5 bg-sand-900 border border-sand-800 px-3 py-1 rounded-xl">
+                        <span className="text-sand-300 font-bold flex items-center gap-1.5 bg-sand-900 border border-sand-800 px-3.5 py-1.5 rounded-xl">
                           <Clock className="w-4 h-4 text-ember-400 animate-pulse" />
                           {Math.floor(questionTimer / 60)}:{String(questionTimer % 60).padStart(2, '0')}
                         </span>
@@ -1741,8 +1745,8 @@ export default function App() {
                     </div>
 
                     {/* Question Statement */}
-                    <div className="bg-sand-950 p-6 rounded-2xl border border-sand-850 space-y-4">
-                      <p className="text-sm font-semibold leading-relaxed text-sand-100">
+                    <div className="bg-sand-950 p-6 sm:p-7 rounded-2xl border border-sand-850 space-y-5">
+                      <p className="text-base sm:text-lg font-semibold leading-relaxed text-sand-100">
                         {finalExams[activeExamQuestionIndex]?.text}
                       </p>
                       
@@ -1754,22 +1758,22 @@ export default function App() {
                         onChange={(e) => setExamTextInputs(p => ({ ...p, [finalExams[activeExamQuestionIndex].qId]: e.target.value }))} 
                         disabled={lastQuestionEvaluated || loading} 
                         placeholder="Type your final answer here..." 
-                        className="w-full bg-sand-900 border border-sand-800 rounded-xl px-4 py-3 text-xs text-sand-200 focus:outline-none focus:border-clay-500 transition font-mono"
+                        className="w-full bg-sand-900 border border-sand-800 rounded-xl px-4 py-3.5 text-sm sm:text-base text-sand-200 focus:outline-none focus:border-clay-500 transition font-mono"
                       />
                     </div>
 
                     {/* Feedback & Actions */}
                     <div className="pt-2 space-y-3">
-                      <div className="flex justify-between items-center flex-wrap gap-2">
+                      <div className="flex justify-between items-center flex-wrap gap-3">
                         <div>
                           {lastQuestionEvaluated && !isQuestionPassed && (
-                            <span className="text-xs font-mono text-clay-400 flex items-center gap-1.5">
+                            <span className="text-sm font-mono text-clay-400 flex items-center gap-2">
                               <AlertCircle className="w-4 h-4 text-clay-500 shrink-0" />
                               Incorrect. Click Retake or view hint below to retry.
                             </span>
                           )}
                           {lastQuestionEvaluated && isQuestionPassed && (
-                            <span className="text-xs font-mono text-olive-400 flex items-center gap-1.5">
+                            <span className="text-sm font-mono text-olive-400 flex items-center gap-2">
                               <CheckCircle2 className="w-4 h-4 text-olive-500 shrink-0" />
                               Correct answer verified!
                             </span>
@@ -1783,16 +1787,16 @@ export default function App() {
                                 setShowSideHintBox(!showSideHintBox);
                                 if (!showSideHintBox) setHintsUsedCount(prev => prev + 1);
                               }}
-                              className="bg-amber-600/10 hover:bg-amber-600/20 border border-amber-500/30 text-amber-800 px-4 py-2.5 rounded-xl text-xs font-bold uppercase transition flex items-center gap-1.5"
+                              className="bg-amber-600/10 hover:bg-amber-600/20 border border-amber-500/30 text-amber-800 px-5 py-3 rounded-xl text-sm font-bold uppercase transition flex items-center gap-2"
                             >
-                              <Sparkles className="w-3.5 h-3.5 text-amber-800" />
+                              <Sparkles className="w-4 h-4 text-amber-800" />
                               <span>{showSideHintBox ? 'Hide Socratic Hint' : 'Socratic Hint'}</span>
                             </button>
                           )}
                           {lastQuestionEvaluated && !isQuestionPassed && (
                             <button 
                               onClick={triggerRetakeAttemptLoop} 
-                              className="bg-amber-600/20 border border-amber-500/30 text-amber-800 px-5 py-2.5 rounded-xl text-xs font-bold uppercase transition"
+                              className="bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 text-amber-800 px-6 py-3 rounded-xl text-sm font-bold uppercase transition"
                             >
                               Retake Question
                             </button>
@@ -1800,7 +1804,7 @@ export default function App() {
                           {lastQuestionEvaluated ? (
                             <button 
                               onClick={forceAdvanceNextItem} 
-                              className="bg-clay-600 hover:bg-clay-500 text-white px-6 py-2.5 rounded-xl text-xs font-bold uppercase transition flex items-center gap-1.5 shadow-lg shadow-sand-300/25"
+                              className="bg-clay-600 hover:bg-clay-500 text-white px-7 py-3 rounded-xl text-sm font-bold uppercase transition flex items-center gap-2 shadow-lg shadow-sand-300/25"
                             >
                               <span>Next Question</span>
                               <ChevronRight className="w-4 h-4" />
@@ -1809,7 +1813,7 @@ export default function App() {
                             <button 
                               onClick={handleShortAnswerEvaluation} 
                               disabled={loading || !(examTextInputs[finalExams[activeExamQuestionIndex].qId] || "").trim()} 
-                              className="bg-gradient-to-r from-ember-600 to-clay-600 hover:from-ember-500 hover:to-clay-500 text-white font-bold px-6 py-2.5 rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-sand-300/25 transition disabled:opacity-40"
+                              className="bg-gradient-to-r from-ember-600 to-clay-600 hover:from-ember-500 hover:to-clay-500 text-white font-bold px-7 py-3 rounded-xl text-sm uppercase tracking-wider shadow-lg shadow-sand-300/25 transition disabled:opacity-40"
                             >
                               Verify & Submit Item
                             </button>
@@ -1819,36 +1823,36 @@ export default function App() {
 
                       {/* Expandable Socratic Hint & Diagnosis Box */}
                       {showSideHintBox && serverEvaluatedHint && (
-                        <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-2xl text-xs space-y-3 animate-fadeIn">
+                        <div className="bg-amber-500/10 border border-amber-500/30 p-5 rounded-2xl text-sm space-y-3 animate-fadeIn">
                           <div className="flex items-center gap-2 border-b border-amber-600/25 pb-2">
-                            <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                            <span className="text-[10px] font-mono tracking-widest text-amber-800 font-bold uppercase">
+                            <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+                            <span className="text-xs font-mono tracking-wider text-amber-800 font-bold uppercase">
                               Mamdani Socratic Hint & Diagnostic Analysis
                             </span>
                           </div>
                           {mamdaniGapAnalysis && (
-                            <p className="text-[11px] text-amber-800 font-mono bg-amber-500/10 p-2.5 rounded-xl border border-amber-600/25 leading-snug">
+                            <p className="text-sm text-amber-800 font-mono bg-amber-500/10 p-3 rounded-xl border border-amber-600/25 leading-relaxed">
                               <strong className="text-amber-800">Diagnosis:</strong> {mamdaniGapAnalysis}
                             </p>
                           )}
                           <div className="border-t border-amber-600/25 pt-2">
-                            <HintMarkdown text={serverEvaluatedHint} className="text-sand-200 text-xs" />
+                            <HintMarkdown text={serverEvaluatedHint} className="text-sand-200 text-sm" />
                           </div>
                         </div>
                       )}
                     </div>
 
                     {/* Live Exam Question Ledger Bar */}
-                    <div className="bg-sand-950/60 border border-sand-900 p-3 rounded-2xl flex items-center gap-2 overflow-x-auto custom-scrollbar font-mono text-[10px]">
-                      <span className="text-sand-500 font-bold uppercase tracking-wider text-[9px] mr-1">Ledger:</span>
+                    <div className="bg-sand-950/60 border border-sand-900 p-3.5 rounded-2xl flex items-center gap-2.5 overflow-x-auto custom-scrollbar font-mono text-xs">
+                      <span className="text-sand-500 font-bold uppercase tracking-wider text-xs mr-1">Ledger:</span>
                       {finalExams.map((q, i) => {
                         const record = questionScoreRegistry[q.qId];
                         return (
                           <div 
                             key={q.qId} 
-                            className={`px-2.5 py-1 rounded-lg border flex items-center gap-1.5 whitespace-nowrap ${
+                            className={`px-3 py-1.5 rounded-xl border flex items-center gap-2 whitespace-nowrap text-xs ${
                               i === activeExamQuestionIndex
-                                ? 'border-clay-500/60 bg-clay-950/30 text-clay-200'
+                                ? 'border-clay-500/60 bg-clay-950/30 text-clay-200 font-semibold'
                                 : 'border-sand-800 bg-sand-900/40 text-sand-400'
                             }`}
                           >
@@ -1858,7 +1862,7 @@ export default function App() {
                                 {Math.round(record.score)}% ({record.attempts}a / {record.latency}s)
                               </span>
                             ) : (
-                              <span className="text-sand-600">Pending</span>
+                              <span className="text-sand-600 italic">Pending</span>
                             )}
                           </div>
                         );
@@ -1867,46 +1871,153 @@ export default function App() {
                   </div>
                 ) : (
                   /* EXAM COMPLETED REPORT SCREEN */
-                  <div className="bg-sand-950 p-8 rounded-3xl border border-sand-850 space-y-6 text-center relative overflow-hidden">
-                    <div className="space-y-1">
-                      <h3 className="text-xs font-mono text-sand-500 uppercase tracking-widest">Final Assessment Complete</h3>
-                      <p className="text-2xl font-extrabold text-sand-100">{activeCourseTitle || activeSubject} Scorecard</p>
-                    </div>
+                  (() => {
+                    const totalExamQuestions = finalExams.length;
+                    const correctExamCount = finalExams.filter(q => questionScoreRegistry[q.qId]?.correct).length;
+                    const marksObtained = totalExamQuestions > 0 ? correctExamCount : (examReport.calculated_score ? Math.round(examReport.calculated_score / 10) : 0);
+                    const maxMarks = totalExamQuestions > 0 ? totalExamQuestions : 10;
 
-                    <div className="flex flex-col items-center justify-center gap-2 py-4">
-                      <div className="w-28 h-28 rounded-full border-4 border-sand-800 flex flex-col items-center justify-center bg-sand-900 shadow-2xl">
-                        <span className="text-3xl font-black bg-gradient-to-tr from-ember-400 to-clay-400 bg-clip-text text-transparent">
-                          {examReport.calculated_score}%
-                        </span>
-                      </div>
-                      <span className="bg-clay-950 border border-clay-800 text-clay-300 text-xs font-black uppercase px-4 py-1.5 rounded-full shadow">
-                        {examReport.rating_tier}
-                      </span>
-                    </div>
-
-                    <div className="text-left space-y-4 max-w-2xl mx-auto">
-                      <div className="bg-sand-900/60 p-5 rounded-2xl border border-sand-800 space-y-2">
-                        <span className="text-[10px] font-mono text-sand-500 uppercase tracking-wider">Academic Mentor Remarks</span>
-                        <p className="text-xs text-sand-300 leading-relaxed">{examReport.mentor_remark}</p>
-                      </div>
-
-                      {examReport.remediation_hint && (
-                        <div className="bg-sand-900/60 p-5 rounded-2xl border border-clay-500/30 text-xs space-y-2">
-                          <span className="text-[10px] font-mono text-clay-400 uppercase tracking-wider font-bold">Personalized Remediation Plan</span>
-                          <HintMarkdown text={examReport.remediation_hint} />
+                    return (
+                      <div className="bg-sand-950 p-8 sm:p-10 rounded-3xl border border-sand-850 space-y-8 text-center relative overflow-hidden shadow-2xl animate-fadeIn">
+                        <div className="space-y-2">
+                          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-olive-500/15 border border-olive-500/30 text-olive-400 text-xs font-mono font-bold uppercase tracking-wider">
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span>Final Assessment Evaluation Complete</span>
+                          </div>
+                          <h2 className="text-2xl sm:text-3xl font-extrabold text-sand-100 tracking-tight">
+                            {activeCourseTitle || activeSubject} Scorecard
+                          </h2>
+                          <p className="text-sm text-sand-400 font-medium">
+                            Official evaluation marks, performance rating, and adaptive mentor analysis
+                          </p>
                         </div>
-                      )}
-                    </div>
 
-                    <div className="pt-4">
-                      <button
-                        onClick={() => { clearSessions(); setActiveView('theory'); }}
-                        className="px-6 py-2.5 bg-gradient-to-r from-clay-600 to-ember-600 text-white text-xs font-bold rounded-xl shadow-lg transition"
-                      >
-                        Return to Study Deck
-                      </button>
-                    </div>
-                  </div>
+                        {/* Prominent Marks & Score Card Panel */}
+                        <div className="bg-sand-900/90 border border-sand-800 rounded-3xl p-6 sm:p-8 max-w-2xl mx-auto shadow-md">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 divide-y sm:divide-y-0 sm:divide-x divide-sand-800/80 items-center">
+                            
+                            {/* Marks Obtained */}
+                            <div className="text-center pt-2 sm:pt-0">
+                              <span className="text-xs font-mono uppercase tracking-wider text-sand-500 font-bold block mb-2">
+                                Marks Obtained
+                              </span>
+                              <div className="text-3xl sm:text-4xl font-black text-sand-50">
+                                {marksObtained}
+                                <span className="text-lg font-semibold text-sand-400"> / {maxMarks}</span>
+                              </div>
+                              <span className="text-xs font-medium text-sand-400 mt-1.5 inline-block">
+                                {marksObtained === maxMarks ? 'Full Marks Achieved' : `${marksObtained} of ${maxMarks} Items Correct`}
+                              </span>
+                            </div>
+
+                            {/* Percentage Score */}
+                            <div className="text-center pt-5 sm:pt-0 sm:pl-5">
+                              <span className="text-xs font-mono uppercase tracking-wider text-sand-500 font-bold block mb-2">
+                                Percentage Score
+                              </span>
+                              <div className="text-3xl sm:text-4xl font-black bg-gradient-to-tr from-ember-400 to-clay-400 bg-clip-text text-transparent">
+                                {examReport.calculated_score}%
+                              </div>
+                              <span className="text-xs font-medium text-sand-400 mt-1.5 inline-block">
+                                Calibrated Grade
+                              </span>
+                            </div>
+
+                            {/* Performance Tier */}
+                            <div className="text-center pt-5 sm:pt-0 sm:pl-5">
+                              <span className="text-xs font-mono uppercase tracking-wider text-sand-500 font-bold block mb-2">
+                                Performance Tier
+                              </span>
+                              <div className="mt-1">
+                                <span className="inline-block bg-clay-950 border border-clay-800 text-clay-300 text-xs sm:text-sm font-black uppercase px-4 py-1.5 rounded-full shadow">
+                                  {examReport.rating_tier}
+                                </span>
+                              </div>
+                              <span className="text-xs font-medium text-sand-400 mt-1.5 inline-block">
+                                Certified Mastery
+                              </span>
+                            </div>
+
+                          </div>
+                        </div>
+
+                        {/* Question Breakdown by Marks */}
+                        {totalExamQuestions > 0 && (
+                          <div className="bg-sand-900/90 border border-sand-800 rounded-3xl p-6 sm:p-7 max-w-2xl mx-auto text-left space-y-4 shadow-sm">
+                            <div className="flex items-center justify-between border-b border-sand-800 pb-3">
+                              <span className="text-xs font-mono uppercase tracking-wider text-sand-400 font-bold">
+                                Evaluation Marks by Question
+                              </span>
+                              <span className="text-xs font-mono font-bold text-olive-400">
+                                Total: {marksObtained} / {maxMarks} Marks ({Math.round((marksObtained / maxMarks) * 100)}%)
+                              </span>
+                            </div>
+                            <div className="divide-y divide-sand-800/60 space-y-2.5 pt-1">
+                              {finalExams.map((q, i) => {
+                                const record = questionScoreRegistry[q.qId];
+                                const isPassed = !!record?.correct;
+                                return (
+                                  <div key={q.qId} className="pt-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                    <div className="flex items-start gap-3">
+                                      <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold font-mono shrink-0 mt-0.5 ${
+                                        isPassed 
+                                          ? 'bg-olive-500/20 text-olive-300 border border-olive-500/40' 
+                                          : 'bg-clay-500/20 text-clay-300 border border-clay-500/40'
+                                      }`}>
+                                        {i + 1}
+                                      </span>
+                                      <div>
+                                        <h4 className="text-sm font-bold text-sand-100">{q.moduleOrigin || `Question ${i + 1}`}</h4>
+                                        <p className="text-xs text-sand-400 line-clamp-1">{q.text}</p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 self-end sm:self-auto shrink-0 font-mono text-xs">
+                                      <span className={`px-2.5 py-1 rounded-lg font-bold border ${
+                                        isPassed
+                                          ? 'bg-olive-500/15 text-olive-400 border-olive-500/30'
+                                          : 'bg-clay-500/15 text-clay-400 border-clay-500/30'
+                                      }`}>
+                                        {isPassed ? '1 / 1 Mark (Passed)' : '0 / 1 Mark (Review)'}
+                                      </span>
+                                      {record && (
+                                        <span className="text-sand-500 text-xs hidden sm:inline">
+                                          {record.latency}s • {record.attempts}a
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Mentor Remarks & Remediation Plan */}
+                        <div className="text-left space-y-4 max-w-2xl mx-auto">
+                          <div className="bg-sand-900/70 p-6 rounded-2xl border border-sand-800 space-y-2">
+                            <span className="text-xs font-mono text-sand-500 uppercase tracking-wider font-bold">Academic Mentor Remarks</span>
+                            <p className="text-sm text-sand-200 leading-relaxed font-sans">{examReport.mentor_remark}</p>
+                          </div>
+
+                          {examReport.remediation_hint && (
+                            <div className="bg-sand-900/70 p-6 rounded-2xl border border-clay-500/30 space-y-2">
+                              <span className="text-xs font-mono text-clay-400 uppercase tracking-wider font-bold">Personalized Remediation Plan</span>
+                              <HintMarkdown text={examReport.remediation_hint} className="text-sm text-sand-200 font-sans" />
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="pt-2">
+                          <button
+                            onClick={() => { clearSessions(); setActiveView('theory'); }}
+                            className="px-8 py-3 bg-gradient-to-r from-clay-600 to-ember-600 hover:from-clay-500 hover:to-ember-500 text-white text-sm font-bold rounded-2xl shadow-lg transition active:scale-95"
+                          >
+                            Return to Study Deck
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()
                 )}
               </div>
             ) : (
@@ -1917,253 +2028,446 @@ export default function App() {
           </div>
         )}
 
-        {/* PAGE 5: GLASS-BOX TELEMETRY & DIAGNOSTICS */}
+        {/* PAGE 5: USER-ORIENTED LEARNING DASHBOARD & TELEMETRY */}
         {activeView === 'telemetry' && (
           <div className="space-y-6 max-w-5xl mx-auto animate-fadeIn">
             <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-sand-800 shadow-2xl space-y-6">
-              <div className="flex items-center gap-2.5 pb-4 border-b border-sand-800">
-                <div className="p-2 bg-clay-500/20 rounded-xl text-clay-400 border border-clay-500/30">
-                  <Activity className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-sand-50">Glass-Box Cognitive Telemetry</h3>
-                  <span className="text-[11px] text-sand-400 font-mono">Live state machine & Mamdani fuzzy evaluation parameters</span>
-                </div>
-              </div>
-
-              {/* Row 1: State Machine & Mamdani FIS 2.0 Live Output */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Active Routing Node */}
-                <div className="bg-sand-950 p-5 rounded-2xl border border-sand-900 space-y-3">
-                  <span className="text-[10px] font-mono uppercase tracking-widest text-sand-500 font-bold">LangGraph Active State</span>
-                  <div className="flex items-center gap-2 text-sm font-bold text-clay-300">
-                    <BrainCircuit className="w-4 h-4 text-clay-400" />
-                    <span>{telemetry.activeNode || 'Idle'}</span>
+              
+              {/* Dashboard Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-sand-800">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-clay-500/20 rounded-2xl text-clay-400 border border-clay-500/30">
+                    <Activity className="w-6 h-6" />
                   </div>
-                  <div className="text-[11px] text-sand-400 font-mono">
-                    Remedial Routing Active: <span className={telemetry.remedialPathActive ? 'text-amber-800' : 'text-olive-400'}>{String(telemetry.remedialPathActive)}</span>
-                  </div>
-                </div>
-
-                {/* Mamdani FIS 2.0 Engine Live Score */}
-                <div className="bg-sand-950 border border-sand-900 rounded-2xl p-5 flex flex-col items-center justify-center relative overflow-hidden shadow-inner space-y-2">
-                  <div className="text-[9px] font-mono uppercase tracking-widest text-sand-500 font-bold">
-                    Defuzzified Centroid Score
-                  </div>
-                  <div className="text-3xl font-black bg-gradient-to-r from-olive-400 via-amber-300 to-amber-400 bg-clip-text text-transparent">
-                    {mamdaniDefuzzifiedScore !== null ? `${mamdaniDefuzzifiedScore}%` : (mamdaniFuzzyScore !== null ? `${mamdaniFuzzyScore}%` : '---')}
-                  </div>
-                  {mamdaniFuzzyScore !== null && mamdaniDefuzzifiedScore !== null && mamdaniFuzzyScore !== mamdaniDefuzzifiedScore && (
-                    <div className="text-[10px] font-mono text-sand-400">
-                      Calibrated Score: <span className="text-olive-400 font-bold">{mamdaniFuzzyScore}%</span>
-                    </div>
-                  )}
-                  
-                  <div className="flex items-center gap-2">
-                    <span className={`text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full border ${
-                      mamdaniTier === 'High Mastery'      ? 'bg-olive-500/20 text-olive-300 border-olive-500/40 shadow-[0_0_10px_rgba(174,189,94,0.25)]' :
-                      mamdaniTier === 'Moderate Mastery'  ? 'bg-ember-500/20 text-ember-300 border-ember-500/40 shadow-[0_0_10px_rgba(233,146,79,0.25)]' :
-                      mamdaniTier === 'Developing'        ? 'bg-yellow-500/20 text-yellow-800 border-yellow-500/40 shadow-[0_0_10px_rgba(234,179,8,0.2)]' :
-                      mamdaniTier === 'Intervention Required' ? 'bg-clay-500/20 text-clay-300 border-clay-500/40 shadow-[0_0_10px_rgba(217,138,133,0.25)]' :
-                      'bg-sand-900 text-sand-500 border-sand-800'
-                    }`}>
-                      {mamdaniTier || 'Awaiting Input'}
-                    </span>
-                    {currentDegreeOfFailure > 0 && (
-                      <span className="text-[9px] font-mono text-clay-400/90">
-                        Deficit: {currentDegreeOfFailure}%
-                      </span>
-                    )}
-                  </div>
-
-                  {mamdaniRemark && (
-                    <p className="text-[9px] text-sand-400 italic text-center leading-snug border-t border-sand-900 pt-2 w-full">
-                      "{mamdaniRemark}"
+                  <div>
+                    <h2 className="text-xl sm:text-2xl font-extrabold text-sand-50 tracking-tight">
+                      Learning Performance & Telemetry Dashboard
+                    </h2>
+                    <p className="text-sm text-sand-400 font-sans mt-0.5">
+                      Real-time understanding metrics, response pacing, learning state, and transparent evaluation telemetry
                     </p>
-                  )}
+                  </div>
                 </div>
-              </div>
 
-              {/* Row 2: 5-Factor Gauges & Live Question Ledger */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* 5-Factor Multi-Parameter Sensor Gauges */}
-                <div className="bg-sand-950 p-5 rounded-2xl border border-sand-900 space-y-3">
-                  <div className="text-[10px] font-mono uppercase tracking-wider text-sand-400 font-bold flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
-                      <BrainCircuit className="w-3.5 h-3.5 text-olive-400" />
-                      Multi-Parameter Inputs
-                    </span>
-                    <span className="text-olive-400 text-[9px]">Live Fuzzification</span>
-                  </div>
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setShowGlassBoxDetails(!showGlassBoxDetails)}
+                    className="py-2.5 px-4 bg-sand-900 hover:bg-sand-850 border border-sand-800 hover:border-sand-700 rounded-xl text-sand-300 text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all shadow-sm"
+                  >
+                    <Cpu className="w-4 h-4 text-clay-400" />
+                    <span>{showGlassBoxDetails ? 'Hide Engine Telemetry' : 'Show Engine Telemetry'}</span>
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showGlassBoxDetails ? 'rotate-180' : ''}`} />
+                  </button>
 
-                  {/* 1. Accuracy */}
-                  <div className="bg-sand-900/60 border border-sand-800/80 p-2.5 rounded-xl space-y-1">
-                    <div className="flex justify-between text-[10px] font-mono">
-                      <span className="text-sand-400 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3 text-olive-400" />
-                        Accuracy (μ_acc)
-                      </span>
-                      <span className="text-sand-200 font-bold">
-                        {mamdaniMetrics ? `${Math.round(mamdaniMetrics.accuracy_pct)}%` : '--'}
-                      </span>
-                    </div>
-                    <div className="w-full h-1.5 bg-sand-900 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-gradient-to-r from-amber-500 to-olive-400 transition-all duration-500"
-                        style={{ width: `${mamdaniMetrics ? Math.max(5, mamdaniMetrics.accuracy_pct) : 0}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* 2. Latency / Pacing */}
-                  <div className="bg-sand-900/60 border border-sand-800/80 p-2.5 rounded-xl space-y-1">
-                    <div className="flex justify-between text-[10px] font-mono">
-                      <span className="text-sand-400 flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-ember-400" />
-                        Pacing (μ_lat)
-                      </span>
-                      <span className="text-ember-300 font-bold">
-                        {questionTimer}s {questionTimer <= 60 ? '(Fast)' : '(Slow)'}
-                      </span>
-                    </div>
-                    <div className="w-full h-1.5 bg-sand-900 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full transition-all duration-500 ${questionTimer <= 60 ? 'bg-ember-400' : 'bg-amber-500'}`}
-                        style={{ width: `${Math.min(100, (questionTimer / 120) * 100)}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* 3. Attempts Persistence */}
-                  <div className="bg-sand-900/60 border border-sand-800/80 p-2.5 rounded-xl space-y-1">
-                    <div className="flex justify-between text-[10px] font-mono">
-                      <span className="text-sand-400 flex items-center gap-1">
-                        <RotateCcw className="w-3 h-3 text-clay-400" />
-                        Attempts (μ_att)
-                      </span>
-                      <span className="text-clay-300 font-bold">
-                        Attempt {currentAttemptsCount} {currentAttemptsCount === 1 ? '(1st Try)' : '(Retry)'}
-                      </span>
-                    </div>
-                    <div className="w-full h-1.5 bg-sand-900 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-clay-500 transition-all duration-500"
-                        style={{ width: `${Math.min(100, currentAttemptsCount * 25)}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* 4. Error Severity */}
-                  <div className="bg-sand-900/60 border border-sand-800/80 p-2.5 rounded-xl space-y-1">
-                    <div className="flex justify-between text-[10px] font-mono">
-                      <span className="text-sand-400 flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3 text-clay-400" />
-                        Error Severity (μ_sev)
-                      </span>
-                      <span className={`font-bold ${mamdaniErrorSeverity > 0.6 ? 'text-clay-400' : (mamdaniErrorSeverity > 0.2 ? 'text-amber-800' : 'text-olive-400')}`}>
-                        {mamdaniErrorSeverity > 0.6 ? 'Critical Flaw' : (mamdaniErrorSeverity > 0.2 ? 'Procedural Gap' : 'Minor Slip')} ({(mamdaniErrorSeverity * 100).toFixed(0)}%)
-                      </span>
-                    </div>
-                    <div className="w-full h-1.5 bg-sand-900 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full transition-all duration-500 ${mamdaniErrorSeverity > 0.6 ? 'bg-clay-500' : (mamdaniErrorSeverity > 0.2 ? 'bg-amber-500' : 'bg-olive-500')}`}
-                        style={{ width: `${Math.max(5, mamdaniErrorSeverity * 100)}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* 5. Hint Dependency */}
-                  <div className="bg-sand-900/60 border border-sand-800/80 p-2.5 rounded-xl space-y-1">
-                    <div className="flex justify-between text-[10px] font-mono">
-                      <span className="text-sand-400 flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-amber-800" />
-                        Scaffolding (μ_hnt)
-                      </span>
-                      <span className="text-amber-800 font-bold">
-                        {hintsUsedCount === 0 ? 'Autonomous (0)' : `Assisted (${hintsUsedCount} hints)`}
-                      </span>
-                    </div>
-                    <div className="w-full h-1.5 bg-sand-900 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-amber-400 transition-all duration-500"
-                        style={{ width: `${Math.min(100, hintsUsedCount * 50)}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* BENCHMARK INSPECTOR MODAL TRIGGER */}
                   <button
                     type="button"
                     onClick={() => setShowBenchmarkModal(true)}
-                    className="w-full mt-2 py-2 px-3 bg-olive-950/40 hover:bg-olive-900/60 border border-olive-500/30 hover:border-olive-500/50 rounded-xl text-olive-300 font-mono text-[11px] font-bold flex items-center justify-between transition-all duration-200 shadow-sm"
+                    className="py-2.5 px-4 bg-olive-950/40 hover:bg-olive-900/60 border border-olive-500/30 hover:border-olive-500/50 rounded-xl text-olive-300 font-mono text-xs sm:text-sm font-bold flex items-center gap-2 transition-all shadow-sm active:scale-95"
                   >
-                    <span className="flex items-center gap-1.5">
-                      <BrainCircuit className="w-3.5 h-3.5 text-olive-400" />
-                      10 Benchmark Scenarios
-                    </span>
-                    <span className="bg-olive-500/20 text-olive-300 text-[9px] px-2 py-0.5 rounded border border-olive-500/40">
+                    <BrainCircuit className="w-4 h-4 text-olive-400" />
+                    <span>10 Calibration Benchmarks</span>
+                    <span className="bg-olive-500/20 text-olive-300 text-xs px-2 py-0.5 rounded border border-olive-500/40">
                       10/10 Verified
                     </span>
                   </button>
                 </div>
+              </div>
 
-                {/* Question Ledger Grid */}
-                <div className="bg-sand-950 p-5 rounded-2xl border border-sand-900 space-y-3 flex flex-col">
-                  <div className="flex justify-between items-center border-b border-sand-900 pb-2">
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-sand-400 font-bold flex items-center gap-1.5">
-                      <Bookmark className="w-3.5 h-3.5 text-clay-400" />
-                      Live Exam Question Ledger
+              {/* Row 1: Executive Learning Health & Progress KPIs (4 Key Metrics) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                
+                {/* 1. Overall Mastery Score */}
+                <div className="bg-sand-950 border border-sand-900 rounded-2xl p-5 flex flex-col justify-between shadow-inner space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono uppercase tracking-wider text-sand-400 font-bold flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5 text-amber-500" />
+                      Mastery Score
                     </span>
-                    <span className="text-[9px] font-mono text-clay-400">
-                      {finalExams.length} Total Questions
+                    <span className={`text-xs font-black uppercase px-2.5 py-0.5 rounded-full border shadow-sm ${
+                      mamdaniTier === 'High Mastery'      ? 'bg-olive-500/20 text-olive-300 border-olive-500/40' :
+                      mamdaniTier === 'Moderate Mastery'  ? 'bg-ember-500/20 text-ember-300 border-ember-500/40' :
+                      mamdaniTier === 'Developing'        ? 'bg-yellow-500/20 text-yellow-800 border-yellow-500/40' :
+                      mamdaniTier === 'Intervention Required' ? 'bg-clay-500/20 text-clay-300 border-clay-500/40' :
+                      'bg-sand-900 text-sand-400 border-sand-800'
+                    }`}>
+                      {mamdaniTier || 'Active'}
+                    </span>
+                  </div>
+                  <div>
+                    <div className="text-3xl sm:text-4xl font-black bg-gradient-to-r from-olive-400 via-amber-300 to-amber-500 bg-clip-text text-transparent">
+                      {mamdaniDefuzzifiedScore !== null ? `${mamdaniDefuzzifiedScore}%` : (mamdaniFuzzyScore !== null ? `${mamdaniFuzzyScore}%` : '---')}
+                    </div>
+                    <span className="text-xs text-sand-400 font-medium block mt-1">Calibrated Concept Mastery</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-sand-900 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-amber-500 to-olive-400 rounded-full transition-all duration-500"
+                      style={{ width: `${mamdaniDefuzzifiedScore || mamdaniFuzzyScore || 0}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-mono text-sand-500">
+                    Defuzzified Centroid: {mamdaniDefuzzifiedScore !== null ? `${mamdaniDefuzzifiedScore}%` : '--'}
+                  </span>
+                </div>
+
+                {/* 2. Current Learning Phase & AI Mode */}
+                <div className="bg-sand-950 border border-sand-900 rounded-2xl p-5 flex flex-col justify-between shadow-inner space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono uppercase tracking-wider text-sand-400 font-bold flex items-center gap-1.5">
+                      <BrainCircuit className="w-3.5 h-3.5 text-clay-400" />
+                      AI Tutor State
+                    </span>
+                    <span className={`text-xs font-mono px-2 py-0.5 rounded-full border ${telemetry.remedialPathActive ? 'bg-amber-500/10 text-amber-800 border-amber-500/40' : 'bg-olive-500/10 text-olive-300 border-olive-500/30'}`}>
+                      {telemetry.remedialPathActive ? 'Remedial' : 'Adaptive'}
+                    </span>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-clay-200">
+                      {telemetry.activeNode === 'DiagnosticEvaluationNode' ? 'Diagnostic Assessment' :
+                       telemetry.activeNode === 'DirectExplanationNode' ? 'Direct Remediation' :
+                       telemetry.activeNode === 'SocraticScaffoldingNode' ? 'Socratic Scaffolding' :
+                       'Interactive Practice'}
+                    </h3>
+                    <p className="text-xs text-sand-400 font-sans mt-1 line-clamp-2">
+                      {telemetry.activeNode === 'DiagnosticEvaluationNode' ? 'Evaluating answer accuracy & depth' :
+                       telemetry.activeNode === 'DirectExplanationNode' ? 'Targeted step-by-step concept remediation' :
+                       telemetry.activeNode === 'SocraticScaffoldingNode' ? 'Prompting discovery via adaptive questions' :
+                       'Awaiting inquiries & practice problems'}
+                    </p>
+                  </div>
+                  <span className="text-xs font-mono text-sand-500 truncate">
+                    Node: <strong className="text-clay-300">{telemetry.activeNode || 'Idle'}</strong>
+                  </span>
+                </div>
+
+                {/* 3. Response Pacing & Speed */}
+                <div className="bg-sand-950 border border-sand-900 rounded-2xl p-5 flex flex-col justify-between shadow-inner space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono uppercase tracking-wider text-sand-400 font-bold flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-ember-400" />
+                      Response Pacing
+                    </span>
+                    <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-sand-900 text-sand-300 border border-sand-800">
+                      {questionTimer <= 30 ? 'Speedy' : questionTimer <= 60 ? 'Optimal' : 'Deliberate'}
+                    </span>
+                  </div>
+                  <div>
+                    <div className="text-3xl sm:text-4xl font-black text-ember-300 font-mono">
+                      {questionTimer}s
+                    </div>
+                    <span className="text-xs text-sand-400 font-medium block mt-1">
+                      {questionTimer <= 60 ? 'Within target latency (< 60s)' : 'Extended formulation latency'}
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 bg-sand-900 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${questionTimer <= 60 ? 'bg-ember-400' : 'bg-amber-500'}`}
+                      style={{ width: `${Math.min(100, (questionTimer / 120) * 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-mono text-sand-500">
+                    Pacing Latency Factor: μ_lat
+                  </span>
+                </div>
+
+                {/* 4. Problem Persistence */}
+                <div className="bg-sand-950 border border-sand-900 rounded-2xl p-5 flex flex-col justify-between shadow-inner space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono uppercase tracking-wider text-sand-400 font-bold flex items-center gap-1.5">
+                      <RotateCcw className="w-3.5 h-3.5 text-clay-400" />
+                      Problem Attempts
+                    </span>
+                    <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-sand-900 text-sand-300 border border-sand-800">
+                      {currentAttemptsCount === 1 ? '1st Try' : `${currentAttemptsCount} Tries`}
+                    </span>
+                  </div>
+                  <div>
+                    <div className="text-3xl sm:text-4xl font-black text-clay-300 font-mono">
+                      Attempt {currentAttemptsCount}
+                    </div>
+                    <span className="text-xs text-sand-400 font-medium block mt-1">
+                      {currentAttemptsCount === 1 ? 'Solved on initial attempt' : 'Iterative problem refinement'}
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 bg-sand-900 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-clay-500 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(100, currentAttemptsCount * 25)}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-mono text-sand-500">
+                    Persistence Factor: μ_att
+                  </span>
+                </div>
+
+              </div>
+
+              {/* Row 2: Multi-Factor Cognitive Meters & Exam Question Ledger */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                {/* 5-Factor Cognitive Meters Card */}
+                <div className="bg-sand-950 p-6 rounded-3xl border border-sand-900 space-y-5">
+                  <div className="flex items-center justify-between border-b border-sand-900 pb-3">
+                    <div>
+                      <span className="text-xs font-mono uppercase tracking-wider text-sand-400 font-bold flex items-center gap-2">
+                        <BrainCircuit className="w-4 h-4 text-olive-400" />
+                        Multi-Factor Cognitive Performance
+                      </span>
+                      <p className="text-xs text-sand-500 font-sans mt-0.5">
+                        5-factor student proficiency modeled via Mamdani Fuzzy Inference System
+                      </p>
+                    </div>
+                    <span className="text-olive-400 text-xs font-mono font-bold bg-olive-500/10 px-2.5 py-1 rounded-lg border border-olive-500/30">
+                      Mamdani FIS
                     </span>
                   </div>
 
-                  <div className="overflow-y-auto space-y-2 font-mono text-xs custom-scrollbar flex-1 max-h-[300px]">
+                  <div className="space-y-3.5">
+                    {/* 1. Accuracy */}
+                    <div className="bg-sand-900/60 border border-sand-800/80 p-4 rounded-2xl space-y-2">
+                      <div className="flex justify-between items-center text-sm font-mono">
+                        <span className="text-sand-200 flex items-center gap-2 font-semibold">
+                          <CheckCircle2 className="w-4 h-4 text-olive-400" />
+                          Response Accuracy
+                        </span>
+                        <span className="text-sand-100 font-bold text-base">
+                          {mamdaniMetrics ? `${Math.round(mamdaniMetrics.accuracy_pct)}%` : '--'}
+                        </span>
+                      </div>
+                      <div className="w-full h-2.5 bg-sand-900 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-gradient-to-r from-amber-500 to-olive-400 transition-all duration-500 rounded-full"
+                          style={{ width: `${mamdaniMetrics ? Math.max(5, mamdaniMetrics.accuracy_pct) : 0}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-xs text-sand-400 font-mono">
+                        <span>Solution correctness & mathematical accuracy</span>
+                        <span className="text-sand-500">Factor: μ_acc</span>
+                      </div>
+                    </div>
+
+                    {/* 2. Latency / Pacing */}
+                    <div className="bg-sand-900/60 border border-sand-800/80 p-4 rounded-2xl space-y-2">
+                      <div className="flex justify-between items-center text-sm font-mono">
+                        <span className="text-sand-200 flex items-center gap-2 font-semibold">
+                          <Clock className="w-4 h-4 text-ember-400" />
+                          Response Pacing & Latency
+                        </span>
+                        <span className="text-ember-300 font-bold text-base">
+                          {questionTimer}s {questionTimer <= 60 ? '(Optimal Pace)' : '(Deliberate)'}
+                        </span>
+                      </div>
+                      <div className="w-full h-2.5 bg-sand-900 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full transition-all duration-500 rounded-full ${questionTimer <= 60 ? 'bg-ember-400' : 'bg-amber-500'}`}
+                          style={{ width: `${Math.min(100, (questionTimer / 120) * 100)}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-xs text-sand-400 font-mono">
+                        <span>Time elapsed per problem</span>
+                        <span className="text-sand-500">Factor: μ_lat</span>
+                      </div>
+                    </div>
+
+                    {/* 3. Attempts Persistence */}
+                    <div className="bg-sand-900/60 border border-sand-800/80 p-4 rounded-2xl space-y-2">
+                      <div className="flex justify-between items-center text-sm font-mono">
+                        <span className="text-sand-200 flex items-center gap-2 font-semibold">
+                          <RotateCcw className="w-4 h-4 text-clay-400" />
+                          Problem Persistence & Tenacity
+                        </span>
+                        <span className="text-clay-300 font-bold text-base">
+                          Attempt {currentAttemptsCount} {currentAttemptsCount === 1 ? '(1st Try)' : '(Retry)'}
+                        </span>
+                      </div>
+                      <div className="w-full h-2.5 bg-sand-900 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-clay-500 transition-all duration-500 rounded-full"
+                          style={{ width: `${Math.min(100, currentAttemptsCount * 25)}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-xs text-sand-400 font-mono">
+                        <span>Attempts to reach correct solution</span>
+                        <span className="text-sand-500">Factor: μ_att</span>
+                      </div>
+                    </div>
+
+                    {/* 4. Error Severity */}
+                    <div className="bg-sand-900/60 border border-sand-800/80 p-4 rounded-2xl space-y-2">
+                      <div className="flex justify-between items-center text-sm font-mono">
+                        <span className="text-sand-200 flex items-center gap-2 font-semibold">
+                          <AlertCircle className="w-4 h-4 text-clay-400" />
+                          Conceptual Precision & Error Severity
+                        </span>
+                        <span className={`font-bold text-base ${mamdaniErrorSeverity > 0.6 ? 'text-clay-400' : (mamdaniErrorSeverity > 0.2 ? 'text-amber-800' : 'text-olive-400')}`}>
+                          {mamdaniErrorSeverity > 0.6 ? 'Critical Flaw' : (mamdaniErrorSeverity > 0.2 ? 'Procedural Gap' : 'Minor Slip')} ({(mamdaniErrorSeverity * 100).toFixed(0)}%)
+                        </span>
+                      </div>
+                      <div className="w-full h-2.5 bg-sand-900 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full transition-all duration-500 rounded-full ${mamdaniErrorSeverity > 0.6 ? 'bg-clay-500' : (mamdaniErrorSeverity > 0.2 ? 'bg-amber-500' : 'bg-olive-500')}`}
+                          style={{ width: `${Math.max(5, mamdaniErrorSeverity * 100)}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-xs text-sand-400 font-mono">
+                        <span>Differentiates arithmetic slip from conceptual misconception</span>
+                        <span className="text-sand-500">Factor: μ_sev</span>
+                      </div>
+                    </div>
+
+                    {/* 5. Hint Dependency */}
+                    <div className="bg-sand-900/60 border border-sand-800/80 p-4 rounded-2xl space-y-2">
+                      <div className="flex justify-between items-center text-sm font-mono">
+                        <span className="text-sand-200 flex items-center gap-2 font-semibold">
+                          <Sparkles className="w-4 h-4 text-amber-800" />
+                          Scaffolding & Independence
+                        </span>
+                        <span className="text-amber-800 font-bold text-base">
+                          {hintsUsedCount === 0 ? 'Autonomous (0 Hints)' : `Assisted (${hintsUsedCount} Hints)`}
+                        </span>
+                      </div>
+                      <div className="w-full h-2.5 bg-sand-900 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-amber-400 transition-all duration-500 rounded-full"
+                          style={{ width: `${Math.min(100, hintsUsedCount * 50)}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-xs text-sand-400 font-mono">
+                        <span>Reliance on Socratic hints</span>
+                        <span className="text-sand-500">Factor: μ_hnt</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Exam Question Ledger Card */}
+                <div className="bg-sand-950 p-6 rounded-3xl border border-sand-900 space-y-4 flex flex-col">
+                  <div className="flex justify-between items-center border-b border-sand-900 pb-3">
+                    <div>
+                      <span className="text-xs font-mono uppercase tracking-wider text-sand-400 font-bold flex items-center gap-2">
+                        <Bookmark className="w-4 h-4 text-clay-400" />
+                        Assessment Ledger & Progress
+                      </span>
+                      <p className="text-xs text-sand-500 font-sans mt-0.5">
+                        Track progress, marks, and response stats for each question
+                      </p>
+                    </div>
+                    <span className="text-xs font-mono font-bold text-clay-300 bg-sand-900 px-3 py-1 rounded-xl border border-sand-800">
+                      {finalExams.length} Total Items
+                    </span>
+                  </div>
+
+                  <div className="overflow-y-auto space-y-3 font-mono text-sm custom-scrollbar flex-1 max-h-[440px] pr-1">
                     {finalExams.length > 0 ? (
                       finalExams.map((q, i) => {
                         const record = questionScoreRegistry[q.qId];
                         return (
-                          <div key={q.qId} className="flex justify-between items-center bg-sand-900/60 p-3 rounded-xl border border-sand-800/80">
+                          <div key={q.qId} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-sand-900/60 p-4 rounded-2xl border border-sand-800/80">
                             <div>
-                              <span className="text-sand-300 font-bold">Q{i + 1}: </span>
-                              <span className="text-sand-500 text-[11px]">{q.moduleOrigin || `Module ${i+1}`}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sand-100 font-bold text-sm">Q{i + 1}: </span>
+                                <span className="text-sand-300 text-xs font-semibold">{q.moduleOrigin || `Module ${i+1}`}</span>
+                              </div>
+                              <p className="text-xs text-sand-400 font-sans mt-0.5 line-clamp-1">{q.text}</p>
                             </div>
                             {record ? (
-                              <span className={`font-bold text-xs ${record.correct ? 'text-olive-400' : 'text-clay-400'}`}>
-                                {Math.round(record.score)}% ({record.attempts}a / {record.latency}s {record.error_severity ? `• sev ${Math.round(record.error_severity * 100)}%` : ''})
-                              </span>
+                              <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                                <span className={`font-bold text-xs px-2.5 py-1 rounded-lg border ${record.correct ? 'bg-olive-500/10 text-olive-300 border-olive-500/30' : 'bg-clay-500/10 text-clay-300 border-clay-500/30'}`}>
+                                  {record.correct ? '1/1 Mark (Passed)' : '0/1 Mark (Review)'}
+                                </span>
+                                <span className="text-sand-500 text-xs">
+                                  {record.attempts}a • {record.latency}s
+                                </span>
+                              </div>
                             ) : (
-                              <span className="text-sand-600 text-xs italic">Pending</span>
+                              <span className="text-sand-600 text-xs italic shrink-0 self-end sm:self-auto">Pending Evaluation</span>
                             )}
                           </div>
                         );
                       })
                     ) : (
-                      <span className="text-sand-700 italic block text-center py-6 text-xs">No active exam questions.</span>
+                      <span className="text-sand-600 italic block text-center py-12 text-sm">No active exam questions recorded yet.</span>
                     )}
                   </div>
                 </div>
+
               </div>
 
               {/* Row 3: Retrieved Context Chunks / ChromaDB RAG */}
-              <div className="bg-sand-950 p-5 rounded-2xl border border-sand-900 space-y-3">
-                <span className="text-[10px] font-mono uppercase tracking-widest text-clay-400 font-bold flex items-center gap-1.5">
-                  <Database className="w-3.5 h-3.5 text-clay-400" />
-                  ChromaDB Verified Grounding Chunks (RAG Context)
-                </span>
+              <div className="bg-sand-950 p-6 rounded-3xl border border-sand-900 space-y-4">
+                <div>
+                  <span className="text-xs font-mono uppercase tracking-wider text-clay-400 font-bold flex items-center gap-2">
+                    <Database className="w-4 h-4 text-clay-400" />
+                    Curriculum Grounding & Verified RAG Context (ChromaDB)
+                  </span>
+                  <p className="text-xs text-sand-500 font-sans mt-0.5">
+                    Authoritative textbook reference chunks verified and retrieved to ground tutor responses
+                  </p>
+                </div>
+
                 {telemetry.retrievedContext && telemetry.retrievedContext.length > 0 ? (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {telemetry.retrievedContext.map((doc, idx) => (
-                      <div key={idx} className="p-3 bg-sand-900/60 rounded-xl border border-sand-800 text-xs text-sand-300 font-mono leading-relaxed">
+                      <div key={idx} className="p-4 sm:p-5 bg-sand-900/60 rounded-2xl border border-sand-800 text-sm sm:text-base text-sand-300 font-mono leading-relaxed">
                         {doc}
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-sand-600 font-mono italic py-2">No active RAG chunks retrieved for current query turn.</p>
+                  <p className="text-sm text-sand-600 font-mono italic py-4">No active RAG chunks retrieved for current query turn.</p>
                 )}
               </div>
+
+              {/* Expandable Transparent Glass-Box Engine Diagnostics */}
+              {showGlassBoxDetails && (
+                <div className="bg-sand-950 p-6 sm:p-7 rounded-3xl border border-clay-500/30 space-y-5 animate-fadeIn">
+                  <div className="flex items-center justify-between border-b border-sand-900 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <Cpu className="w-5 h-5 text-clay-400" />
+                      <h4 className="text-base font-bold text-sand-100">
+                        Transparent Glass-Box Engine Telemetry (Mamdani FIS & LangGraph)
+                      </h4>
+                    </div>
+                    <span className="text-xs font-mono text-clay-400 bg-clay-500/10 px-2.5 py-1 rounded-full border border-clay-500/30 font-semibold">
+                      Live Engine State
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm font-mono">
+                    <div className="bg-sand-900/60 p-4 rounded-2xl border border-sand-800 space-y-1">
+                      <span className="text-xs text-sand-500 block uppercase font-bold">Defuzzified Centroid</span>
+                      <div className="text-xl font-bold text-amber-800">
+                        {mamdaniDefuzzifiedScore !== null ? `${mamdaniDefuzzifiedScore}%` : '--'}
+                      </div>
+                      <span className="text-xs text-sand-400 block">Formula: Centroid = (∑ μ_i · y_i) / ∑ μ_i</span>
+                    </div>
+
+                    <div className="bg-sand-900/60 p-4 rounded-2xl border border-sand-800 space-y-1">
+                      <span className="text-xs text-sand-500 block uppercase font-bold">LangGraph Active Node</span>
+                      <div className="text-xl font-bold text-clay-300 truncate">
+                        {telemetry.activeNode || 'Idle'}
+                      </div>
+                      <span className="text-xs text-sand-400 block">Branch: {telemetry.remedialPathActive ? 'Remedial' : 'Standard'}</span>
+                    </div>
+
+                    <div className="bg-sand-900/60 p-4 rounded-2xl border border-sand-800 space-y-1">
+                      <span className="text-xs text-sand-500 block uppercase font-bold">Concept Gap Deficit</span>
+                      <div className="text-xl font-bold text-olive-400">
+                        {currentDegreeOfFailure > 0 ? `${currentDegreeOfFailure}%` : 'Optimal Alignment'}
+                      </div>
+                      <span className="text-xs text-sand-400 block">Tier: {mamdaniTier || 'Evaluating'}</span>
+                    </div>
+                  </div>
+
+                  {mamdaniRemark && (
+                    <div className="bg-sand-900/40 p-4 rounded-2xl border border-sand-900 text-sm text-sand-300 font-sans italic">
+                      Mentor Diagnostic Remark: "{mamdaniRemark}"
+                    </div>
+                  )}
+                </div>
+              )}
+
             </div>
           </div>
         )}
@@ -2180,66 +2484,66 @@ export default function App() {
       {/* 10-SCENARIO MAMDANI INFERENCE BENCHMARK MODAL */}
       {showBenchmarkModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-sand-50/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-sand-950 border border-sand-800 rounded-2xl max-w-5xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+          <div className="bg-sand-950 border border-sand-800 rounded-3xl max-w-5xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b border-sand-800 bg-sand-900/60">
-              <div className="flex items-center gap-2.5">
+            <div className="flex items-center justify-between p-5 border-b border-sand-800 bg-sand-900/60">
+              <div className="flex items-center gap-3">
                 <BrainCircuit className="w-5 h-5 text-olive-400" />
                 <div>
-                  <h3 className="text-sm font-bold text-sand-100 flex items-center gap-2">
+                  <h3 className="text-base font-bold text-sand-100 flex items-center gap-2.5">
                     Mamdani Inference Engine: 10 Ground-Truth Benchmark Scenarios
-                    <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-olive-500/20 text-olive-300 border border-olive-500/40">
+                    <span className="text-xs font-mono font-semibold px-2.5 py-0.5 rounded-full bg-olive-500/20 text-olive-300 border border-olive-500/40">
                       10/10 Exact Match
                     </span>
                   </h3>
-                  <p className="text-[11px] text-sand-400">
+                  <p className="text-xs text-sand-400 mt-0.5">
                     Direct comparison against official table specification for Defuzzified Centroid and Final Calibrated Scores.
                   </p>
                 </div>
               </div>
               <button 
                 onClick={() => setShowBenchmarkModal(false)}
-                className="text-sand-400 hover:text-sand-50 p-1.5 rounded-lg hover:bg-sand-800 transition-colors"
+                className="text-sand-400 hover:text-sand-50 p-2 rounded-xl hover:bg-sand-800 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Modal Content Table */}
-            <div className="p-4 overflow-y-auto custom-scrollbar flex-1 space-y-3">
-              <div className="overflow-x-auto rounded-xl border border-sand-800">
-                <table className="w-full text-left text-[11px] font-mono">
-                  <thead className="bg-sand-900 text-sand-400 border-b border-sand-800 text-[10px] uppercase tracking-wider">
+            <div className="p-5 overflow-y-auto custom-scrollbar flex-1 space-y-4">
+              <div className="overflow-x-auto rounded-2xl border border-sand-800">
+                <table className="w-full text-left text-xs font-mono">
+                  <thead className="bg-sand-900 text-sand-400 border-b border-sand-800 text-xs uppercase tracking-wider">
                     <tr>
-                      <th className="py-2.5 px-3"># Scenario</th>
-                      <th className="py-2.5 px-2">Accuracy (A)</th>
-                      <th className="py-2.5 px-2">Latency (L)</th>
-                      <th className="py-2.5 px-2">Attempts (Natt)</th>
-                      <th className="py-2.5 px-2">Error Severity (E)</th>
-                      <th className="py-2.5 px-2">Hints (H)</th>
-                      <th className="py-2.5 px-2">Fired Rules</th>
-                      <th className="py-2.5 px-2 text-amber-800">Defuzzified Centroid</th>
-                      <th className="py-2.5 px-2 text-olive-400">Final Calibrated</th>
-                      <th className="py-2.5 px-2">Tier</th>
-                      <th className="py-2.5 px-2 text-center">Live Test</th>
+                      <th className="py-3 px-3.5"># Scenario</th>
+                      <th className="py-3 px-2.5">Accuracy (A)</th>
+                      <th className="py-3 px-2.5">Latency (L)</th>
+                      <th className="py-3 px-2.5">Attempts (Natt)</th>
+                      <th className="py-3 px-2.5">Error Severity (E)</th>
+                      <th className="py-3 px-2.5">Hints (H)</th>
+                      <th className="py-3 px-2.5">Fired Rules</th>
+                      <th className="py-3 px-2.5 text-amber-800">Defuzzified Centroid</th>
+                      <th className="py-3 px-2.5 text-olive-400">Final Calibrated</th>
+                      <th className="py-3 px-2.5">Tier</th>
+                      <th className="py-3 px-2.5 text-center">Live Test</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-sand-800/60 bg-sand-950/40">
                     {BENCHMARK_SCENARIOS.map((sc) => (
                       <tr key={sc.id} className="hover:bg-sand-900/50 transition-colors">
-                        <td className="py-2.5 px-3 font-semibold text-sand-200">
+                        <td className="py-3 px-3.5 font-semibold text-sand-200">
                           {sc.title}
                         </td>
-                        <td className="py-2.5 px-2 text-sand-300 font-bold">{sc.accuracy}%</td>
-                        <td className="py-2.5 px-2 text-sand-300">{sc.pacingLabel}</td>
-                        <td className="py-2.5 px-2 text-sand-300">{sc.attempts}</td>
-                        <td className="py-2.5 px-2 text-sand-300">{sc.severityLabel}</td>
-                        <td className="py-2.5 px-2 text-sand-300">{sc.hints}</td>
-                        <td className="py-2.5 px-2 text-amber-800 text-[10px] font-semibold">{sc.firedRules}</td>
-                        <td className="py-2.5 px-2 font-black text-amber-800">{sc.centroid.toFixed(2)}%</td>
-                        <td className="py-2.5 px-2 font-black text-olive-400">{sc.finalScore.toFixed(2)}%</td>
-                        <td className="py-2.5 px-2">
-                          <span className={`text-[9px] px-2 py-0.5 rounded border font-semibold ${
+                        <td className="py-3 px-2.5 text-sand-300 font-bold">{sc.accuracy}%</td>
+                        <td className="py-3 px-2.5 text-sand-300">{sc.pacingLabel}</td>
+                        <td className="py-3 px-2.5 text-sand-300">{sc.attempts}</td>
+                        <td className="py-3 px-2.5 text-sand-300">{sc.severityLabel}</td>
+                        <td className="py-3 px-2.5 text-sand-300">{sc.hints}</td>
+                        <td className="py-3 px-2.5 text-amber-800 text-xs font-semibold">{sc.firedRules}</td>
+                        <td className="py-3 px-2.5 font-black text-amber-800">{sc.centroid.toFixed(2)}%</td>
+                        <td className="py-3 px-2.5 font-black text-olive-400">{sc.finalScore.toFixed(2)}%</td>
+                        <td className="py-3 px-2.5">
+                          <span className={`text-xs px-2.5 py-0.5 rounded-full border font-semibold ${
                             sc.tier === 'High Mastery' ? 'bg-olive-500/10 text-olive-400 border-olive-500/30' :
                             sc.tier === 'Developing' ? 'bg-yellow-500/10 text-yellow-800 border-yellow-500/30' :
                             'bg-clay-500/10 text-clay-400 border-clay-500/30'
@@ -2247,13 +2551,13 @@ export default function App() {
                             {sc.tier}
                           </span>
                         </td>
-                        <td className="py-2.5 px-2 text-center">
+                        <td className="py-3 px-2.5 text-center">
                           <button
                             onClick={() => {
                               handleSimulateScenario(sc);
                               setShowBenchmarkModal(false);
                             }}
-                            className="px-2.5 py-1 bg-olive-500/20 hover:bg-olive-500/30 text-olive-300 border border-olive-500/40 rounded text-[9px] font-bold transition-all shadow-sm"
+                            className="px-3 py-1.5 bg-olive-500/20 hover:bg-olive-500/30 text-olive-300 border border-olive-500/40 rounded-xl text-xs font-bold transition-all shadow-sm"
                           >
                             Load Gauges
                           </button>
@@ -2264,9 +2568,9 @@ export default function App() {
                 </table>
               </div>
 
-              <div className="bg-sand-900/60 border border-sand-800 p-3 rounded-xl flex items-center justify-between text-[11px] text-sand-400">
+              <div className="bg-sand-900/60 border border-sand-800 p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between text-xs text-sand-400 gap-2">
                 <span>Click <strong className="text-sand-200">Load Gauges</strong> on any scenario to test the real-time defuzzified centroid and multi-parameter gauges in the live dashboard.</span>
-                <span className="text-olive-400 font-bold font-mono">10 / 10 Benchmarks Verified & Calibrated</span>
+                <span className="text-olive-400 font-bold font-mono whitespace-nowrap">10 / 10 Benchmarks Verified & Calibrated</span>
               </div>
             </div>
           </div>

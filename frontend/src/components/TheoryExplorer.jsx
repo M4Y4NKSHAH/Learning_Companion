@@ -109,19 +109,19 @@ export default function TheoryExplorer({
       {/* TOP HEADER CONTROLS */}
       <div className="glass-panel p-6 rounded-3xl border border-sand-800 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-wider bg-clay-500/20 text-clay-300 border border-clay-500/30">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="px-3 py-1 rounded-full text-xs font-mono uppercase tracking-wider bg-clay-500/20 text-clay-300 border border-clay-500/30 font-semibold">
               Interactive Theory Explorer
             </span>
             <span className="text-sand-600">•</span>
-            <span className="text-xs font-mono text-sand-400">
+            <span className="text-sm font-mono text-sand-400">
               {currentChapter ? `Chapter ${currentChapter.chapter_index || 1} of ${chapters.length || 1}` : courseTitle}
             </span>
           </div>
-          <h2 className="text-xl font-extrabold text-sand-50 tracking-tight">
+          <h2 className="text-xl sm:text-2xl font-extrabold text-sand-50 tracking-tight">
             {currentChapter?.title || courseTitle}
           </h2>
-          <p className="text-xs text-sand-400 mt-1 max-w-2xl">
+          <p className="text-sm text-sand-400 mt-1 max-w-2xl leading-relaxed">
             {currentChapter?.summary ? currentChapter.summary.slice(0, 160) + '...' : 'Explore detailed theoretical principles, mathematical formulations, and mental models.'}
           </p>
         </div>
@@ -205,8 +205,8 @@ export default function TheoryExplorer({
                   "Apply analytical formulations to problem solving",
                   "Identify key boundary conditions and diagnostic traps"
                 ]).map((obj, i) => (
-                  <li key={i} className="flex items-start gap-2.5 text-xs text-sand-300 leading-normal">
-                    <span className="w-4 h-4 rounded-full bg-olive-500/20 text-olive-400 font-mono text-[10px] flex items-center justify-center flex-shrink-0 mt-0.5 font-bold">
+                  <li key={i} className="flex items-start gap-3 text-sm text-sand-300 leading-relaxed">
+                    <span className="w-5 h-5 rounded-full bg-olive-500/20 text-olive-400 font-mono text-xs flex items-center justify-center flex-shrink-0 mt-0.5 font-bold">
                       {i + 1}
                     </span>
                     <span>{obj}</span>
@@ -225,7 +225,7 @@ export default function TheoryExplorer({
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-sand-50">Governing Principles & Definitions</h3>
-                  <p className="text-xs text-sand-400">Invariant axioms and fundamental mechanics established by this module</p>
+                  <p className="text-sm text-sand-400">Invariant axioms and fundamental mechanics established by this module</p>
                 </div>
               </div>
             </div>
@@ -234,19 +234,19 @@ export default function TheoryExplorer({
               {principles.map((pr, idx) => (
                 <div key={idx} className="p-5 rounded-2xl bg-sand-900/70 border border-sand-800 hover:border-ember-500/40 transition-all space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="px-2 py-0.5 rounded-md text-[10px] font-mono uppercase bg-ember-500/20 text-ember-300 font-semibold">
+                    <span className="px-2.5 py-1 rounded-md text-xs font-mono uppercase bg-ember-500/20 text-ember-300 font-semibold">
                       {pr.tag || "Core Axiom"}
                     </span>
                     <button 
                       onClick={() => handleCopy(pr.content, `pr_${idx}`)}
-                      className="text-sand-500 hover:text-sand-300 p-1 rounded transition"
+                      className="text-sand-500 hover:text-sand-300 p-1.5 rounded transition"
                       title="Copy excerpt"
                     >
-                      {copiedId === `pr_${idx}` ? <Check className="w-3.5 h-3.5 text-olive-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copiedId === `pr_${idx}` ? <Check className="w-4 h-4 text-olive-400" /> : <Copy className="w-4 h-4" />}
                     </button>
                   </div>
-                  <h4 className="text-sm font-bold text-sand-100">{pr.title}</h4>
-                  <p className="text-xs text-sand-300 leading-relaxed font-sans">{pr.content}</p>
+                  <h4 className="text-base font-bold text-sand-100">{pr.title}</h4>
+                  <p className="text-sm text-sand-300 leading-relaxed font-sans">{pr.content}</p>
                 </div>
               ))}
             </div>
@@ -260,7 +260,7 @@ export default function TheoryExplorer({
               </div>
               <div>
                 <h3 className="text-base font-bold text-sand-50">Mathematical Formulations & Derivations</h3>
-                <p className="text-xs text-sand-400">Governing equations, variable relations, and analytical rules</p>
+                <p className="text-sm text-sand-400">Governing equations, variable relations, and analytical rules</p>
               </div>
             </div>
 
@@ -268,8 +268,8 @@ export default function TheoryExplorer({
               {formulations.map((fm, idx) => (
                 <div key={idx} className="p-6 rounded-2xl bg-sand-950 border border-clay-500/20 space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-sand-900">
-                    <h4 className="text-sm font-bold text-clay-200">{fm.title}</h4>
-                    <span className="text-[10px] font-mono text-sand-400 bg-sand-900 px-2.5 py-1 rounded-lg border border-sand-800">
+                    <h4 className="text-base font-bold text-clay-200">{fm.title}</h4>
+                    <span className="text-xs font-mono text-sand-400 bg-sand-900 px-3 py-1 rounded-lg border border-sand-800">
                       Analytical Specification
                     </span>
                   </div>
@@ -279,14 +279,14 @@ export default function TheoryExplorer({
                     {fm.formula}
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                    <div className="p-3 rounded-xl bg-sand-900/50 border border-sand-800/80">
-                      <span className="text-[10px] font-bold uppercase text-sand-400 block mb-1">Derivation Logic</span>
-                      <p className="text-sand-300">{fm.derivation}</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                    <div className="p-3.5 rounded-xl bg-sand-900/50 border border-sand-800/80">
+                      <span className="text-xs font-bold uppercase text-sand-400 block mb-1">Derivation Logic</span>
+                      <p className="text-sand-300 leading-relaxed">{fm.derivation}</p>
                     </div>
-                    <div className="p-3 rounded-xl bg-sand-900/50 border border-sand-800/80">
-                      <span className="text-[10px] font-bold uppercase text-sand-400 block mb-1">State Variables & Constants</span>
-                      <p className="text-sand-300">{fm.variables}</p>
+                    <div className="p-3.5 rounded-xl bg-sand-900/50 border border-sand-800/80">
+                      <span className="text-xs font-bold uppercase text-sand-400 block mb-1">State Variables & Constants</span>
+                      <p className="text-sand-300 leading-relaxed">{fm.variables}</p>
                     </div>
                   </div>
                 </div>
@@ -378,34 +378,34 @@ export default function TheoryExplorer({
                     : 'border-sand-800 hover:border-sand-700 bg-sand-900/50 hover:bg-sand-900/80'
                 }`}
               >
-                <div className="space-y-3">
+                <div className="space-y-3.5">
                   <div className="flex items-center justify-between">
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-clay-500/20 text-clay-300 border border-clay-500/30">
+                    <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-clay-500/20 text-clay-300 border border-clay-500/30">
                       Module Concept {idx + 1}
                     </span>
-                    <span className="text-[10px] font-mono text-sand-500">
+                    <span className="text-xs font-mono text-sand-500">
                       {isExpanded ? 'Click to collapse' : 'Click to expand'}
                     </span>
                   </div>
 
-                  <h3 className="text-sm font-bold text-sand-50 group-hover:text-clay-300 transition">
+                  <h3 className="text-base font-bold text-sand-50 group-hover:text-clay-300 transition">
                     {card.topic || `Concept ${idx + 1}`}
                   </h3>
 
-                  <p className="text-xs font-semibold text-clay-200 leading-snug">
+                  <p className="text-sm font-semibold text-clay-200 leading-snug">
                     {card.question}
                   </p>
 
-                  <div className={`text-xs text-sand-300 leading-relaxed font-sans pt-2 border-t border-sand-800/80 whitespace-pre-line ${
+                  <div className={`text-sm text-sand-300 leading-relaxed font-sans pt-2 border-t border-sand-800/80 whitespace-pre-line ${
                     isExpanded ? 'block' : 'line-clamp-4'
                   }`}>
                     {card.answer}
                   </div>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-sand-800/50 flex items-center justify-between text-[11px] text-clay-400 font-bold">
+                <div className="mt-4 pt-3 border-t border-sand-800/50 flex items-center justify-between text-xs text-clay-400 font-bold">
                   <span>{isExpanded ? 'Detailed Breakdown Active' : 'Read Deep Breakdown'}</span>
-                  <ChevronRight className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                  <ChevronRight className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                 </div>
               </div>
             );
@@ -420,41 +420,41 @@ export default function TheoryExplorer({
         <div className="glass-panel p-6 sm:p-10 rounded-3xl border border-sand-800 shadow-2xl space-y-6 animate-fadeIn">
           <div className="flex items-center justify-between border-b border-sand-800 pb-4">
             <div className="flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-clay-400" />
-              <span className="text-xs font-bold text-sand-50">
+              <BookOpen className="w-5 h-5 text-clay-400" />
+              <span className="text-sm font-bold text-sand-50">
                 Focus Study Card {displayedCards.length > 0 ? Math.min(cardIndex + 1, displayedCards.length) : 0} of {displayedCards.length}
               </span>
             </div>
-            <span className="text-[11px] font-mono text-sand-400">Click card or spacebar to flip</span>
+            <span className="text-xs font-mono text-sand-400">Click card or spacebar to flip</span>
           </div>
 
           {displayedCards.length > 0 ? (
             <div className="flex flex-col items-center justify-center py-4">
               <div 
                 onClick={() => setIsFlipped(!isFlipped)} 
-                className="flip-card w-full max-w-3xl h-[400px] sm:h-[440px] cursor-pointer group"
+                className="flip-card w-full max-w-3xl h-[420px] sm:h-[460px] cursor-pointer group"
               >
                 <div className={`flip-card-inner ${isFlipped ? 'flipped' : ''}`}>
                   
                   {/* FRONT SIDE (PROMPT) */}
                   <div className="flip-card-front bg-gradient-to-br from-sand-900 via-sand-950 to-clay-950/40 border border-clay-900/40 hover:border-clay-500/60 p-8 sm:p-10 flex flex-col justify-between items-center text-center shadow-2xl rounded-3xl relative overflow-hidden transition-all duration-300">
                     <div className="flex items-center justify-between w-full">
-                      <span className="px-3 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider bg-clay-500/20 text-clay-300 font-bold border border-clay-500/30">
+                      <span className="px-3.5 py-1 rounded-full text-xs font-mono uppercase tracking-wider bg-clay-500/20 text-clay-300 font-bold border border-clay-500/30">
                         {displayedCards[cardIndex]?.topic || 'Core Theory'}
                       </span>
-                      <span className="text-[10px] font-mono text-sand-500">Front (Inquiry)</span>
+                      <span className="text-xs font-mono text-sand-500">Front (Inquiry)</span>
                     </div>
 
-                    <div className="my-auto py-6 max-w-xl space-y-3">
-                      <div className="w-12 h-12 rounded-2xl bg-clay-500/10 text-clay-400 flex items-center justify-center mx-auto border border-clay-500/20 shadow-inner">
-                        <HelpCircle className="w-6 h-6" />
+                    <div className="my-auto py-6 max-w-xl space-y-4">
+                      <div className="w-14 h-14 rounded-2xl bg-clay-500/10 text-clay-400 flex items-center justify-center mx-auto border border-clay-500/20 shadow-inner">
+                        <HelpCircle className="w-7 h-7" />
                       </div>
-                      <h3 className="text-lg sm:text-xl font-bold text-sand-50 leading-relaxed">
+                      <h3 className="text-lg sm:text-2xl font-bold text-sand-50 leading-relaxed">
                         {displayedCards[cardIndex]?.question}
                       </h3>
                     </div>
 
-                    <div className="flex items-center gap-2 text-xs text-clay-400 font-semibold group-hover:translate-y-[-2px] transition">
+                    <div className="flex items-center gap-2 text-sm text-clay-400 font-semibold group-hover:translate-y-[-2px] transition">
                       <span>Click to reveal comprehensive answer</span>
                       <ChevronRight className="w-4 h-4" />
                     </div>
@@ -463,13 +463,13 @@ export default function TheoryExplorer({
                   {/* BACK SIDE (SOLUTION & BULLETS) */}
                   <div className="flip-card-back bg-gradient-to-br from-sand-900 via-clay-950/50 to-sand-950 border border-clay-500/60 p-8 sm:p-10 flex flex-col justify-between text-left shadow-2xl rounded-3xl overflow-y-auto custom-scrollbar">
                     <div className="flex items-center justify-between w-full pb-3 border-b border-clay-500/30">
-                      <span className="px-3 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider bg-olive-500/20 text-olive-300 font-bold border border-olive-500/30">
+                      <span className="px-3.5 py-1 rounded-full text-xs font-mono uppercase tracking-wider bg-olive-500/20 text-olive-300 font-bold border border-olive-500/30">
                         {displayedCards[cardIndex]?.topic || 'Theory Breakdown'}
                       </span>
-                      <span className="text-[10px] font-mono text-clay-300">Back (Synthesis)</span>
+                      <span className="text-xs font-mono text-clay-300">Back (Synthesis)</span>
                     </div>
 
-                    <div className="my-4 text-xs sm:text-sm text-sand-200 leading-relaxed font-sans whitespace-pre-line space-y-2 overflow-y-auto custom-scrollbar max-h-[220px]">
+                    <div className="my-4 text-sm text-sand-200 leading-relaxed font-sans whitespace-pre-line space-y-2 overflow-y-auto custom-scrollbar max-h-[260px]">
                       {displayedCards[cardIndex]?.answer}
                     </div>
 

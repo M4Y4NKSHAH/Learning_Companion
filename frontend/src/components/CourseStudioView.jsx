@@ -244,13 +244,13 @@ export default function CourseStudioView({
                 </div>
               </div>
               <h3 className="text-lg font-bold text-sand-50 mb-1">Synthesizing Course Structure & Question Bank</h3>
-              <p className="text-xs text-sand-400 mb-4 max-w-md">
+              <p className="text-sm text-sand-400 mb-4 max-w-md">
                 Decomposing sections, generating structured bullet flashcards, and generating misconception-mapped exam items.
               </p>
 
               {/* Live Elapsed Badge */}
-              <div className="flex items-center gap-2 mb-6 px-3.5 py-1.5 rounded-full bg-sand-950 border border-sand-800 text-[11px] font-mono text-sand-300">
-                <Clock className="w-3.5 h-3.5 text-clay-400 animate-pulse" />
+              <div className="flex items-center gap-2 mb-6 px-4 py-2 rounded-full bg-sand-950 border border-sand-800 text-xs font-mono text-sand-300">
+                <Clock className="w-4 h-4 text-clay-400 animate-pulse" />
                 <span>Elapsed: <strong className="text-sand-50">{elapsedSec}s</strong></span>
                 <span className="text-sand-600">•</span>
                 <span className="text-clay-300">
@@ -272,7 +272,7 @@ export default function CourseStudioView({
                   return (
                     <div
                       key={idx}
-                      className={`flex items-center justify-between p-3 rounded-xl border transition-all duration-300 ${
+                      className={`flex items-center justify-between p-3.5 rounded-xl border transition-all duration-300 ${
                         isDone
                           ? 'bg-olive-500/10 border-olive-500/30 text-olive-300'
                           : isCurrent
@@ -293,20 +293,20 @@ export default function CourseStudioView({
                           )}
                         </div>
                         <div>
-                          <div className="text-xs font-semibold">{step.label}</div>
-                          <div className="text-[10px] text-sand-400">{step.desc}</div>
+                          <div className="text-sm font-semibold">{step.label}</div>
+                          <div className="text-xs text-sand-400">{step.desc}</div>
                         </div>
                       </div>
 
-                      {isDone && <span className="text-[10px] font-mono text-olive-400 font-bold">Done</span>}
-                      {isCurrent && <span className="text-[10px] font-mono text-clay-400 font-bold animate-pulse">In Progress...</span>}
+                      {isDone && <span className="text-xs font-mono text-olive-400 font-bold">Done</span>}
+                      {isCurrent && <span className="text-xs font-mono text-clay-400 font-bold animate-pulse">In Progress...</span>}
                     </div>
                   );
                 })}
               </div>
 
               {elapsedSec > 10 && (
-                <p className="text-[11px] text-sand-500 font-mono italic max-w-md">
+                <p className="text-xs text-sand-500 font-mono italic max-w-md">
                   💡 Processing extensive multi-page textbook/paper. Generating high-retention flashcards and embedding vector database...
                 </p>
               )}
@@ -354,7 +354,7 @@ export default function CourseStudioView({
               {/* Title & Metadata */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="md:col-span-3">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-sand-300 mb-1.5">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-sand-300 mb-1.5">
                     Course / Topic Title *
                   </label>
                   <input
@@ -362,18 +362,18 @@ export default function CourseStudioView({
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="e.g. Research Paper - GR.05, Advanced Organic Synthesis, Classical Mechanics"
-                    className="w-full bg-sand-900/90 border border-sand-700 rounded-xl px-4 py-2.5 text-xs text-sand-50 placeholder-sand-500 focus:outline-none focus:border-clay-500 focus:ring-1 focus:ring-clay-500"
+                    className="w-full bg-sand-900/90 border border-sand-700 rounded-xl px-4 py-3 text-sm text-sand-50 placeholder-sand-500 focus:outline-none focus:border-clay-500 focus:ring-1 focus:ring-clay-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-sand-300 mb-1.5">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-sand-300 mb-1.5">
                     Subject Field
                   </label>
                   <select
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
-                    className="w-full bg-sand-900/90 border border-sand-700 rounded-xl px-3 py-2.5 text-xs text-sand-50 focus:outline-none focus:border-clay-500"
+                    className="w-full bg-sand-900/90 border border-sand-700 rounded-xl px-3.5 py-3 text-sm text-sand-50 focus:outline-none focus:border-clay-500 font-medium"
                   >
                     {SUBJECT_OPTIONS.map((s) => (
                       <option key={s} value={s} className="bg-sand-900">{s}</option>
@@ -382,13 +382,13 @@ export default function CourseStudioView({
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-sand-300 mb-1.5">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-sand-300 mb-1.5">
                     Target Academic Level
                   </label>
                   <select
                     value={tier}
                     onChange={(e) => setTier(e.target.value)}
-                    className="w-full bg-sand-900/90 border border-sand-700 rounded-xl px-3 py-2.5 text-xs text-sand-50 focus:outline-none focus:border-clay-500"
+                    className="w-full bg-sand-900/90 border border-sand-700 rounded-xl px-3.5 py-3 text-sm text-sand-50 focus:outline-none focus:border-clay-500 font-medium"
                   >
                     {TIER_OPTIONS.map((t) => (
                       <option key={t} value={t} className="bg-sand-900">{t}</option>
@@ -400,7 +400,7 @@ export default function CourseStudioView({
               {/* Source Input */}
               {createMode === 'upload' ? (
                 <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-sand-300 mb-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-sand-300 mb-2">
                     Source Document (PDF, TXT, MD) *
                   </label>
                   <div
@@ -426,7 +426,7 @@ export default function CourseStudioView({
                           <FileCheck className="w-8 h-8" />
                         </div>
                         <div className="text-left">
-                          <div className="text-sm font-semibold text-sand-50">{selectedFile.name}</div>
+                          <div className="text-base font-semibold text-sand-50">{selectedFile.name}</div>
                           <div className="text-xs text-olive-400">
                             {(selectedFile.size / 1024).toFixed(1)} KB • Ready for automated decomposition
                           </div>
@@ -435,7 +435,7 @@ export default function CourseStudioView({
                     ) : (
                       <>
                         <Upload className="w-10 h-10 text-clay-400 mb-3" />
-                        <div className="text-sm font-semibold text-sand-200">Drag & drop your document here, or click to browse</div>
+                        <div className="text-base font-semibold text-sand-200">Drag & drop your document here, or click to browse</div>
                         <div className="text-xs text-sand-500 mt-1">Supports PDF research papers, textbooks (.pdf), text (.txt), and markdown (.md)</div>
                       </>
                     )}
@@ -443,7 +443,7 @@ export default function CourseStudioView({
                 </div>
               ) : (
                 <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-sand-300 mb-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-sand-300 mb-2">
                     Paste Lecture Notes, Syllabus, or Book Sections *
                   </label>
                   <textarea
@@ -451,9 +451,9 @@ export default function CourseStudioView({
                     onChange={(e) => setRawText(e.target.value)}
                     rows={8}
                     placeholder="Paste textbook text, notes, or paper sections here... (Headings like # Chapter 1 or 1. Introduction are automatically organized)"
-                    className="w-full bg-sand-900/90 border border-sand-700 rounded-xl p-4 text-xs text-sand-50 placeholder-sand-500 focus:outline-none focus:border-clay-500 focus:ring-1 focus:ring-clay-500 font-mono leading-relaxed custom-scrollbar"
+                    className="w-full bg-sand-900/90 border border-sand-700 rounded-xl p-4 text-sm text-sand-50 placeholder-sand-500 focus:outline-none focus:border-clay-500 focus:ring-1 focus:ring-clay-500 font-mono leading-relaxed custom-scrollbar"
                   />
-                  <div className="text-right text-[11px] text-sand-500 mt-1">{rawText.length} characters</div>
+                  <div className="text-right text-xs text-sand-500 mt-1">{rawText.length} characters</div>
                 </div>
               )}
 
@@ -505,17 +505,17 @@ export default function CourseStudioView({
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <div>
-                        <div className="flex items-center gap-1.5 mb-1">
+                        <div className="flex items-center gap-2 mb-1">
                           {isCustom ? (
-                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-clay-500/20 text-clay-300 border border-clay-500/30">
+                            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-clay-500/20 text-clay-300 border border-clay-500/30">
                               Custom Ingested
                             </span>
                           ) : (
-                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-ember-500/20 text-ember-300 border border-ember-500/30">
+                            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-ember-500/20 text-ember-300 border border-ember-500/30">
                               Standard
                             </span>
                           )}
-                          <span className="text-[10px] text-sand-400 font-mono">
+                          <span className="text-xs text-sand-400 font-mono">
                             {c.subject} • {c.academic_tier}
                           </span>
                         </div>
@@ -538,7 +538,7 @@ export default function CourseStudioView({
                       )}
                     </div>
 
-                    <div className="flex items-center gap-3 text-[11px] text-sand-400 pt-2 border-t border-sand-800/60 font-mono">
+                    <div className="flex items-center gap-3 text-xs text-sand-400 pt-2 border-t border-sand-800/60 font-mono">
                       <span>{c.chapters_count || c.chapters?.length || 1} Chapters</span>
                       <span>•</span>
                       <span>{c.flashcards_count || c.cards?.length || 0} Flashcards</span>
@@ -558,11 +558,11 @@ export default function CourseStudioView({
                 {/* Course Header Banner */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-sand-800">
                   <div>
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-clay-400 block mb-1">
+                    <span className="text-xs font-mono font-bold uppercase tracking-widest text-clay-400 block mb-1">
                       {activeCourse.is_builtin ? 'Standard Curriculum Repository' : 'Custom Ingested Course'}
                     </span>
                     <h3 className="text-xl font-extrabold text-sand-50">{activeCourse.title}</h3>
-                    <p className="text-xs text-sand-400 mt-1">
+                    <p className="text-sm text-sand-400 mt-1">
                       {activeCourse.description || `Comprehensive learning module for ${activeCourse.title}.`}
                     </p>
                   </div>
@@ -610,7 +610,7 @@ export default function CourseStudioView({
                               </span>
                               <h5 className="text-sm font-bold text-sand-50">{ch.title}</h5>
                             </div>
-                            <span className="text-[10px] font-mono text-sand-400 bg-sand-950 px-2 py-0.5 rounded border border-sand-800">
+                            <span className="text-xs font-mono text-sand-400 bg-sand-950 px-2 py-0.5 rounded border border-sand-800">
                               {(ch.cards || []).length} Flashcards
                             </span>
                           </div>
@@ -624,7 +624,7 @@ export default function CourseStudioView({
                               {ch.objectives.map((obj, oIdx) => (
                                 <span
                                   key={oIdx}
-                                  className="text-[10px] bg-sand-950/80 text-sand-400 px-2.5 py-1 rounded-lg border border-sand-800/80 flex items-center gap-1.5"
+                                  className="text-xs bg-sand-950/80 text-sand-300 px-2.5 py-1 rounded-lg border border-sand-800/80 flex items-center gap-1.5"
                                 >
                                   <Check className="w-3 h-3 text-olive-400 shrink-0" />
                                   <span>{obj}</span>
@@ -639,7 +639,7 @@ export default function CourseStudioView({
                 </div>
               </div>
             ) : (
-              <div className="glass-panel p-12 text-center rounded-2xl border border-sand-800 text-sand-500 text-xs">
+              <div className="glass-panel p-12 text-center rounded-2xl border border-sand-800 text-sand-400 text-sm">
                 No course selected. Ingest a material or pick a course from the library.
               </div>
             )}
