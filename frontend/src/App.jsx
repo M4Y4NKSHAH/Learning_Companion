@@ -1285,136 +1285,127 @@ export default function App() {
       <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] rounded-full bg-clay-500/5 blur-[120px] pointer-events-none"></div>
 
       {/* TOP HEADER */}
-      <header className="w-full glass-panel border-b border-sand-900 px-4 sm:px-8 py-3.5 flex items-center justify-between gap-4 sticky top-0 z-50">
-        <div className="flex items-center gap-3 min-w-0">
+      <header className="w-full glass-panel border-b border-sand-900 px-4 sm:px-6 py-2.5 flex items-center justify-between gap-3 sticky top-0 z-50">
+        {/* BRAND / ACTIVE COURSE (LEFT) */}
+        <div className="flex items-center gap-2.5 shrink min-w-0 max-w-[200px] sm:max-w-[240px] xl:max-w-[280px]">
           <div 
             onClick={() => setView('landing')}
-            className="bg-gradient-to-tr from-ember-600 to-clay-600 p-2 rounded-xl shadow-lg shadow-sand-300/25 shrink-0 cursor-pointer hover:opacity-90 transition"
+            className="bg-gradient-to-tr from-ember-600 to-clay-600 p-2 rounded-xl shadow-lg shadow-sand-300/25 shrink-0 cursor-pointer hover:opacity-90 transition active:scale-95"
             title="Return to Landing Page"
           >
             <BrainCircuit className="w-5 h-5 text-white" />
           </div>
-          <div className="min-w-0">
-            <h1 className="text-base sm:text-lg font-bold tracking-tight bg-gradient-to-r from-sand-50 to-sand-400 bg-clip-text text-transparent whitespace-nowrap">
+          <div className="min-w-0 overflow-hidden">
+            <h1 className="text-sm sm:text-base font-bold tracking-tight bg-gradient-to-r from-sand-50 to-sand-400 bg-clip-text text-transparent truncate" title={activeCourseTitle || 'AURA LEARNING COMPANION'}>
               {activeCourseTitle || 'AURA LEARNING COMPANION'}
             </h1>
-            <p className="text-xs text-sand-500 font-mono uppercase tracking-wider hidden sm:block">
-              {selectedCourseId ? 'Custom Ingested Course' : `${activeSubject} • ${activeTier}`}
+            <p className="text-xs text-sand-500 font-mono uppercase tracking-wider truncate hidden sm:block">
+              {selectedCourseId ? 'Custom Course' : `${activeSubject} • ${activeTier}`}
             </p>
           </div>
         </div>
 
-        {/* PAGE NAVIGATION TABS (DESKTOP) */}
-        <div className="hidden lg:flex items-center bg-sand-900/80 p-1.5 rounded-2xl border border-sand-800 shadow-inner gap-1">
+        {/* PAGE NAVIGATION TABS (DESKTOP CENTER) */}
+        <nav className="hidden lg:flex items-center bg-sand-900/90 p-1 rounded-2xl border border-sand-800 shadow-inner gap-1 shrink-0">
           <button
             onClick={() => setActiveView('studio')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 xl:px-4 xl:py-2 rounded-xl text-xs xl:text-sm font-bold whitespace-nowrap transition-all ${
               activeView === 'studio'
                 ? 'bg-clay-600 text-white shadow-md shadow-sand-300/25'
                 : 'text-sand-400 hover:text-sand-200 hover:bg-sand-800/50'
             }`}
           >
-            <Layers className="w-4 h-4" />
-            <span>Course Studio</span>
+            <Layers className="w-4 h-4 shrink-0" />
+            <span>Studio</span>
           </button>
 
           <button
             onClick={() => setActiveView('theory')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 xl:px-4 xl:py-2 rounded-xl text-xs xl:text-sm font-bold whitespace-nowrap transition-all ${
               activeView === 'theory'
                 ? 'bg-clay-600 text-white shadow-md shadow-sand-300/25'
                 : 'text-sand-400 hover:text-sand-200 hover:bg-sand-800/50'
             }`}
           >
-            <BookOpen className="w-4 h-4" />
+            <BookOpen className="w-4 h-4 shrink-0" />
             <span>Study Deck</span>
           </button>
 
           <button
             onClick={() => setActiveView('quiz')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 xl:px-4 xl:py-2 rounded-xl text-xs xl:text-sm font-bold whitespace-nowrap transition-all ${
               activeView === 'quiz'
                 ? 'bg-olive-600 text-white shadow-md shadow-sand-300/25'
                 : 'text-sand-400 hover:text-sand-200 hover:bg-sand-800/50'
             }`}
           >
-            <HelpCircle className="w-4 h-4" />
+            <HelpCircle className="w-4 h-4 shrink-0" />
             <span>Practice Lab</span>
           </button>
 
           <button
             onClick={() => setActiveView('final_exam')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 xl:px-4 xl:py-2 rounded-xl text-xs xl:text-sm font-bold whitespace-nowrap transition-all ${
               activeView === 'final_exam'
                 ? 'bg-ember-600 text-white shadow-md shadow-sand-300/25'
                 : 'text-sand-400 hover:text-sand-200 hover:bg-sand-800/50'
             }`}
           >
-            <Bookmark className="w-4 h-4" />
-            <span>Evaluation Exam</span>
+            <Bookmark className="w-4 h-4 shrink-0" />
+            <span>Exam</span>
           </button>
 
           <button
             onClick={() => setActiveView('telemetry')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 xl:px-4 xl:py-2 rounded-xl text-xs xl:text-sm font-bold whitespace-nowrap transition-all ${
               activeView === 'telemetry'
                 ? 'bg-sand-800 text-clay-300 border border-clay-500/30 shadow-md'
                 : 'text-sand-400 hover:text-sand-200 hover:bg-sand-800/50'
             }`}
           >
-            <Activity className="w-4 h-4" />
-            <span>Dashboard & Telemetry</span>
+            <Activity className="w-4 h-4 shrink-0" />
+            <span>Telemetry</span>
           </button>
-        </div>
+        </nav>
 
-                        {/* TOP RIGHT CONTROLS */}
-        <div className="hidden md:flex items-center justify-end gap-3">
-          {/* Signed-in user indicator + sign-out */}
-          {session && (
-            <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-sand-800 bg-sand-900/60">
-              <User className="w-4 h-4 text-sand-400" />
-              <span className="text-sm font-medium text-sand-300">{session.name || session.username}</span>
-              <button
-                type="button"
-                onClick={handleSignOut}
-                className="p-1 rounded-lg text-sand-400 hover:text-clay-400 hover:bg-sand-800 transition-colors"
-                aria-label="Sign out"
-                title="Sign out"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-          {customCourses.length > 0 && (
+        {/* TOP RIGHT CONTROLS */}
+        <div className="hidden md:flex items-center justify-end gap-2.5 shrink-0">
+          {/* Unified Curriculum / Course Switcher */}
+          {customCourses.length > 0 ? (
             <select
-              value={selectedCourseId || ''}
+              value={selectedCourseId ? selectedCourseId : activeSubject}
               onChange={(e) => {
-                const cid = e.target.value;
-                if (!cid) {
-                  handleResetToStandardCourse(activeSubject, activeTier);
+                const val = e.target.value;
+                if (['Physics', 'Biology', 'Mathematics'].includes(val)) {
+                  handleResetToStandardCourse(val, activeTier);
                 } else {
-                  const found = customCourses.find(c => c.course_id === cid);
+                  const found = customCourses.find(c => c.course_id === val);
                   if (found) handleSelectCustomCourse(found);
                 }
               }}
-              className="bg-sand-900 border border-clay-500/30 text-clay-300 text-sm px-3.5 py-2 rounded-xl focus:outline-none focus:border-clay-500 font-semibold"
+              className="bg-sand-900/90 border border-clay-500/30 text-sand-200 text-xs xl:text-sm px-3 py-1.5 rounded-xl focus:outline-none focus:border-clay-500 font-semibold max-w-[180px] xl:max-w-[210px] truncate"
+              title="Switch Course"
             >
-              <option value="">Default Standard Subjects</option>
-              {customCourses.map(c => (
-                <option key={c.course_id} value={c.course_id}>
-                  ⭐ {c.title} ({c.chapters_count || 1} Ch)
-                </option>
-              ))}
+              <optgroup label="Standard Subjects">
+                <option value="Physics">Physics ({activeTier})</option>
+                <option value="Biology">Biology ({activeTier})</option>
+                <option value="Mathematics">Mathematics ({activeTier})</option>
+              </optgroup>
+              <optgroup label="Custom Ingested">
+                {customCourses.map(c => (
+                  <option key={c.course_id} value={c.course_id}>
+                    ⭐ {c.title}
+                  </option>
+                ))}
+              </optgroup>
             </select>
-          )}
-
-          {!selectedCourseId && (
-            <div className="flex bg-sand-900/60 p-1.5 rounded-xl border border-sand-800 gap-1">
+          ) : (
+            <div className="flex bg-sand-900/60 p-1 rounded-xl border border-sand-800 gap-1">
               {['Physics', 'Biology', 'Mathematics'].map(sub => (
                 <button 
                   key={sub} 
                   onClick={() => { handleResetToStandardCourse(sub, activeTier); }} 
-                  className={`text-sm px-3.5 py-1.5 rounded-lg font-semibold transition-all ${activeSubject === sub ? 'bg-sand-800 text-sand-50 shadow-sm border border-sand-700' : 'text-sand-400 hover:text-sand-200'}`}
+                  className={`text-xs xl:text-sm px-2.5 xl:px-3 py-1 rounded-lg font-semibold transition-all whitespace-nowrap ${activeSubject === sub ? 'bg-sand-800 text-sand-50 shadow-sm border border-sand-700' : 'text-sand-400 hover:text-sand-200'}`}
                 >
                   {sub}
                 </button>
@@ -1422,12 +1413,29 @@ export default function App() {
             </div>
           )}
 
+          {/* Signed-in user indicator + sign-out */}
+          {session && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-sand-800 bg-sand-900/60 shrink-0">
+              <User className="w-4 h-4 text-sand-400 shrink-0" />
+              <span className="text-xs xl:text-sm font-medium text-sand-300 max-w-[100px] truncate">{session.name || session.username}</span>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="p-0.5 rounded-lg text-sand-400 hover:text-clay-400 hover:bg-sand-800 transition-colors"
+                aria-label="Sign out"
+                title="Sign out"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
           <button
             onClick={() => setIsIngestionModalOpen(true)}
-            className="bg-gradient-to-r from-clay-600 via-amber-600 to-ember-600 hover:from-clay-500 hover:to-ember-500 text-white text-sm font-bold px-4 py-2 rounded-xl shadow-lg shadow-sand-300/25 transition-all flex items-center gap-2 border border-clay-400/30 active:scale-95"
+            className="bg-gradient-to-r from-clay-600 via-amber-600 to-ember-600 hover:from-clay-500 hover:to-ember-500 text-white text-xs xl:text-sm font-bold px-3 xl:px-4 py-1.5 xl:py-2 rounded-xl shadow-lg shadow-sand-300/25 transition-all flex items-center gap-1.5 border border-clay-400/30 active:scale-95 shrink-0 whitespace-nowrap"
           >
-            <Plus className="w-4 h-4 text-yellow-300" />
-            <span>Ingest Material</span>
+            <Plus className="w-4 h-4 text-yellow-300 shrink-0" />
+            <span>Ingest</span>
           </button>
         </div>
 
