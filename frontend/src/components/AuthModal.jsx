@@ -216,7 +216,6 @@ export default function AuthModal({ isOpen, onClose, onAuthenticated, initialMod
               </button>
             )}
           </div>
-          )}
 
           <button
             type="submit"
