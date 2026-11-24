@@ -5,7 +5,11 @@ from typing import Dict, List, Any, Optional
 
 from theory_repo import FLASHCARD_REPOSITORY
 
-COURSES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "courses")
+_data_dir = os.getenv("DATA_DIR")
+if _data_dir:
+    COURSES_DIR = os.path.join(_data_dir, "courses")
+else:
+    COURSES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "courses")
 os.makedirs(COURSES_DIR, exist_ok=True)
 
 

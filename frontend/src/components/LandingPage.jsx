@@ -40,11 +40,11 @@ export default function LandingPage({ onSignUp, onNavigateSubject, onNavigateTie
   const [galleryIndex, setGalleryIndex] = useState(null); // null = lightbox closed
 
   const galleryImages = [
-    { src: gallery1, alt: 'Learning experience preview' },
-    { src: gallery2, alt: 'Gallery preview 2' },
-    { src: gallery3, alt: 'Gallery preview 3' },
-    { src: gallery4, alt: 'Gallery preview 4' },
-    { src: gallery5, alt: 'Gallery preview 5' }
+    { src: gallery1, alt: 'Threshold Final Evaluation — Numerical & Conceptual Assessments' },
+    { src: gallery2, alt: 'Navigation Hub — Socratic Practice Lab & Studio' },
+    { src: gallery3, alt: 'Interactive Socratic Practice Lab — Adaptive Guidance' },
+    { src: gallery4, alt: 'Learning Performance & Telemetry Dashboard' },
+    { src: gallery5, alt: 'Interactive Flashcards — Spaced Repetition & Deep Recall' }
   ];
 
   const openGallery = (index) => setGalleryIndex(index);
@@ -137,7 +137,7 @@ export default function LandingPage({ onSignUp, onNavigateSubject, onNavigateTie
           <div className="bg-gradient-to-tr from-ember-600 to-clay-600 p-2 rounded-xl shadow-lg shadow-sand-300/25">
             <BrainCircuit className="w-5 h-5 text-white" />
           </div>
-          <h1 className="text-sm font-bold tracking-tight bg-gradient-to-r from-sand-50 to-sand-400 bg-clip-text text-transparent">AURA</h1>
+          <h1 className="text-sm font-bold tracking-tight bg-gradient-to-r from-sand-50 to-sand-400 bg-clip-text text-transparent">LearnerHelp</h1>
         </div>
         
         {/* Desktop Nav */}
@@ -220,7 +220,7 @@ export default function LandingPage({ onSignUp, onNavigateSubject, onNavigateTie
           <Reveal direction="left" delay={150}>
             <div className="glass-panel aspect-video rounded-3xl border border-sand-800 flex items-center justify-center bg-sand-900/40 relative group overflow-hidden">
                <div className="absolute inset-0 bg-gradient-to-tr from-ember-500/10 to-clay-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-700 animate-glow-pulse"></div>
-               <img src={heroImage} alt="Aura cognitive learning companion hero illustration" className="w-full h-full object-cover japandi-plate" />
+               <img src={heroImage} alt="LearnerHelp cognitive learning companion hero illustration" className="w-full h-full object-cover japandi-plate" />
             </div>
           </Reveal>
         </section>
@@ -308,7 +308,7 @@ export default function LandingPage({ onSignUp, onNavigateSubject, onNavigateTie
             <div className="text-center space-y-4">
               <h3 className="text-3xl font-bold text-sand-50">Explore Our Curriculum</h3>
               <p className="text-sand-400 max-w-2xl mx-auto">
-                Choose a subject then select your class to launch your personal Aura dashboard.
+                Choose a subject then select your class to launch your personal LearnerHelp dashboard.
               </p>
             </div>
           </Reveal>
@@ -365,7 +365,7 @@ export default function LandingPage({ onSignUp, onNavigateSubject, onNavigateTie
              <div className="relative z-10 space-y-8 max-w-3xl mx-auto px-6">
                 <h3 className="text-4xl font-bold text-sand-50">Ready to Transform Your Learning?</h3>
                 <p className="text-sand-400 text-lg">
-                  Join thousands of students using Aura to accelerate their education. 
+                  Join thousands of students using LearnerHelp to accelerate their education. 
                   Experience the future of personalized tutoring today.
                 </p>
                 <div className="flex flex-wrap justify-center gap-4">
@@ -396,7 +396,7 @@ export default function LandingPage({ onSignUp, onNavigateSubject, onNavigateTie
               <div className="bg-sand-800 p-2 rounded-lg">
                 <BrainCircuit className="w-4 h-4 text-sand-50" />
               </div>
-              <span className="font-bold text-sand-50 tracking-tight">AURA</span>
+              <span className="font-bold text-sand-50 tracking-tight">LearnerHelp</span>
             </div>
             
             <div className="flex gap-8 text-xs font-medium text-sand-500">
@@ -414,7 +414,7 @@ export default function LandingPage({ onSignUp, onNavigateSubject, onNavigateTie
           </div>
           
           <div className="flex flex-col md:flex-row justify-between items-center pt-8 border-t border-sand-900/50 gap-4 text-[10px] font-mono text-sand-600 uppercase tracking-widest">
-            <span>© 2024 Aura Cognitive. All rights reserved.</span>
+            <span>© 2024 LearnerHelp Cognitive. All rights reserved.</span>
             <div className="flex gap-6">
               <a href="#" className="hover:text-sand-400">Privacy Policy</a>
               <a href="#" className="hover:text-sand-400">Terms of Service</a>
@@ -447,7 +447,7 @@ export default function LandingPage({ onSignUp, onNavigateSubject, onNavigateTie
               <h3 className="text-lg font-bold text-sand-50">Choose Your Learning Path</h3>
             </div>
             <p className="text-xs text-sand-400 mb-6">
-              Select your subject and class to launch your personalized Aura dashboard.
+              Select your subject and class to launch your personalized LearnerHelp dashboard.
             </p>
 
             <div className="space-y-5">

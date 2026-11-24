@@ -1,4 +1,4 @@
-# 🧠 Learning Companion (AURA)
+# 🧠 LearnerHelp (Learning Companion)
 
 > **Glass-Box Multi-Agent Socratic Tutoring Platform**  
 > Powered by FastAPI, LangGraph, Local Ollama (`llama3.2:3b`), Google Gemini (`gemini-3.8-flash`), ChromaDB + BM25 Hybrid RAG, and React (Japandi Design System).

@@ -4,6 +4,7 @@ import MaterialIngestionModal from './components/MaterialIngestionModal';
 import CourseStudioView from './components/CourseStudioView';
 import ChapterNav from './components/ChapterNav';
 import TheoryExplorer from './components/TheoryExplorer';
+import { API_BASE } from './config';
 import { 
   BookOpen, 
   HelpCircle, 
@@ -618,7 +619,7 @@ export default function App() {
   // Fetch available courses (custom + built-in)
   const fetchAvailableCourses = async () => {
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/material/courses');
+      const res = await fetch(`${API_BASE}/api/material/courses`);
       if (res.ok) {
         const data = await res.json();
         const coursesList = data.courses || [];
@@ -633,7 +634,7 @@ export default function App() {
 
   const handleDeleteCourse = async (courseId) => {
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/material/course/${courseId}`, {
+      const res = await fetch(`${API_BASE}/api/material/course/${courseId}`, {
         method: 'DELETE',
       });
       if (res.ok) {
@@ -678,7 +679,7 @@ export default function App() {
     setIsCardsCached(false);
     setActiveChapterIndex(null);
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/tutor/load-theory', {
+      const response = await fetch(`${API_BASE}/api/tutor/load-theory`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ current_subject: subject, current_tier: tier, course_id: courseId })
@@ -750,7 +751,7 @@ export default function App() {
   const generateAiFlashcards = async () => {
     setIsGeneratingCards(true);
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/tutor/generate-flashcards', {
+      const response = await fetch(`${API_BASE}/api/tutor/generate-flashcards`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ current_subject: activeSubject, current_tier: activeTier })
@@ -805,7 +806,6 @@ export default function App() {
     if (!studentText.trim()) return;
 
     setLoading(true);
-    const API_BASE = 'http://127.0.0.1:8000';
     try {
       const activeChapterObj = (activeChapterIndex !== null && chapters[activeChapterIndex]) ? chapters[activeChapterIndex] : null;
       const currentChapterId = activeChapterObj?.chapter_id || (activeChapterIndex !== null ? `ch_${activeChapterIndex + 1}` : "");
@@ -991,7 +991,7 @@ export default function App() {
     });
 
     try {
-      let response = await fetch('http://127.0.0.1:8000/api/tutor/evaluate-exam', {
+      let response = await fetch(`${API_BASE}/api/tutor/evaluate-exam`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1048,7 +1048,7 @@ export default function App() {
     const currentChapterId = activeChapterObj?.chapter_id || (activeChapterIndex !== null ? `ch_${activeChapterIndex + 1}` : "");
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/tutor/chat', {
+      const response = await fetch(`${API_BASE}/api/tutor/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1192,7 +1192,7 @@ export default function App() {
           </div>
           <div className="min-w-0">
             <h1 className="text-sm font-bold tracking-tight bg-gradient-to-r from-sand-50 to-sand-400 bg-clip-text text-transparent whitespace-nowrap">
-              {activeCourseTitle || 'AURA LEARNING COMPANION'}
+              {activeCourseTitle || 'LEARNERHELP LEARNING COMPANION'}
             </h1>
             <p className="text-[10px] text-sand-500 font-mono uppercase tracking-widest hidden sm:block">
               {selectedCourseId ? 'Custom Ingested Course' : `${activeSubject} • ${activeTier}`}

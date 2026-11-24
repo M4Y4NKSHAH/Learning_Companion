@@ -1,4 +1,4 @@
-# 🎨 Design — Learning Companion (AURA)
+# 🎨 Design — LearnerHelp (Learning Companion)
 
 > Visual & interaction design reference for the frontend. Covers the Landing Page, the
 > Glass-Box Dashboard, Course Studio, Pedagogical Guardrails, the design tokens, animations, and component inventory.

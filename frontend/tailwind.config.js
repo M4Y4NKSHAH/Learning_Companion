@@ -1,7 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 
 /**
- * AURA "Japandi" theme palette (Japanese minimalism + Scandinavian warmth).
+ * LearnerHelp "Japandi" theme palette (Japanese minimalism + Scandinavian warmth).
  *
  * Material story: washi rice paper, sumi ink, hinoki cedar, matcha moss, raw clay.
  * The palette is LIGHT-first: the neutral ramp runs from ink (50) to paper (950), the

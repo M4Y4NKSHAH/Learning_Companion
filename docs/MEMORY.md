@@ -10,7 +10,7 @@
 
 ## 1. One-Paragraph Summary
 
-AURA is a **glass-box AI tutoring platform**: the student picks a subject
+LearnerHelp is a **glass-box AI tutoring platform**: the student picks a subject
 (Physics / Biology / Mathematics) and a level (Class 10 / Class 11-12 / Undergraduate),
 then studies flashcards, practices short answers, takes a timed exam, and chats with an
 agentic tutor. Every interaction is scored by a **Mamdani-style fuzzy inference system**

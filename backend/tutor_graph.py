@@ -78,6 +78,15 @@ def retrieve_context_node(state: AgentState):
                 chapter_id=chapter_id,
                 n_results=4
             )
+        elif chapter_id and (subject or tier):
+            # Built-in curriculum with chapter-level isolation via hybrid retrieval
+            context = pipeline.query_hybrid(
+                query=latest_query,
+                chapter_id=chapter_id,
+                subject=subject,
+                academic_tier=tier,
+                n_results=4
+            )
         elif course_id:
             # Custom course without explicit chapter specification: hybrid retrieval
             context = pipeline.query_hybrid(
@@ -86,16 +95,13 @@ def retrieve_context_node(state: AgentState):
                 n_results=4
             )
         else:
-            # Built-in curriculum
-            results = pipeline.curriculum_collection.query(
-                query_texts=[latest_query],
-                n_results=3,
-                where={"$and": [
-                    {"academic_tier": tier},
-                    {"subject": subject}
-                ]}
+            # Built-in curriculum hybrid retrieval
+            context = pipeline.query_hybrid(
+                query=latest_query,
+                subject=subject,
+                academic_tier=tier,
+                n_results=3
             )
-            context = results['documents'][0] if results and results.get('documents') else []
     except Exception as e:
         print(f"[tutor_graph] Context retrieval fallback: {e}")
         context = [f"Core textbook reference material for {tier} level structural {subject} parameters."]

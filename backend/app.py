@@ -41,18 +41,45 @@ from pedagogical_guardrails import filter_for_grade_level, normalize_academic_ti
 from local_llm_service import local_llm
 from divide_book import estimate_llm_build, parse_chapter_selection
 
-app = FastAPI(title="Unified Agentic Socratic Tutoring Platform")
+app = FastAPI(title="LearnerHelp - Unified Agentic Socratic Tutoring Platform", version="1.0.0")
 
 # Background job tracker for non-blocking asynchronous course ingestion
 INGESTION_JOBS: dict[str, dict] = {}
 
+cors_origins_env = os.getenv("CORS_ORIGINS", "*")
+if cors_origins_env == "*":
+    allowed_origins = ["*"]
+else:
+    allowed_origins = [o.strip() for o in cors_origins_env.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|.*\.vercel\.app|.*\.onrender\.com)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/health")
+@app.get("/api/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "service": "LearnerHelp API",
+        "version": "1.0.0"
+    }
+
+
+@app.get("/")
+async def root():
+    return {
+        "service": "LearnerHelp API",
+        "status": "online",
+        "docs": "/docs",
+        "health": "/health"
+    }
 
 # --- API PAYLOAD SCHEMAS ---
 class IngestMaterialPayload(BaseModel):
@@ -129,6 +156,16 @@ class TheoryRequestPayload(BaseModel):
     current_tier: str
     current_subject: str
     course_id: Optional[str] = None
+
+
+class ChapterContextPayload(BaseModel):
+    query: str
+    course_id: Optional[str] = None
+    chapter_id: Optional[str] = None
+    chapter_index: Optional[int] = None
+    subject: Optional[str] = "General"
+    academic_tier: Optional[str] = "Standard"
+    n_results: int = 4
 
 
 # --- CORE RAG UTILITY FACTORY ---
@@ -390,12 +427,13 @@ def process_and_ingest_material(
     # ---- Batch vectorize knowledge chunks into ChromaDB (non-blocking for course availability) --- #
     try:
         batch_items = []
-        for ch in raw_chapters:
+        for ch in processed_chapters:
             ch_idx = ch.get("chapter_index", 1)
-            ch_id = ch.get("chapter_id") or f"ch_{ch_idx}"
+            ch_id = str(ch.get("chapter_id") or f"ch_{ch_idx}").strip()
             ch_title = ch.get("title", f"Chapter {ch_idx}")
-            ch_content = ch.get("content") or ch.get("full_text", "")
-            chunks = MaterialParser.create_semantic_chunks(ch_content[:8000], chunk_size=400, overlap=40)[:15]
+            ch_content = ch.get("full_text") or ch.get("content", "")
+            # Generate comprehensive semantic chunks across full chapter text with sliding overlap
+            chunks = MaterialParser.create_semantic_chunks(ch_content[:120000], chunk_size=350, overlap=50)
             if chunks:
                 batch_items.append({
                     "course_id": course_id,
@@ -1150,6 +1188,80 @@ async def generate_ai_flashcards(payload: TheoryRequestPayload):
     result = generate_gemini_flashcards_from_chroma(payload.current_subject, payload.current_tier)
     return result
 
+
+@app.post("/api/tutor/chapter-context")
+async def get_scoped_chapter_context(payload: ChapterContextPayload):
+    """
+    Direct endpoint for chapter-scoped RAG retrieval.
+    Enables isolated chapter context search with zero cross-chapter crosstalk.
+    """
+    db_pipeline = get_db_pipeline()
+    context = db_pipeline.query_hybrid(
+        query=payload.query,
+        course_id=payload.course_id,
+        chapter_id=payload.chapter_id,
+        chapter_index=payload.chapter_index,
+        subject=payload.subject,
+        academic_tier=payload.academic_tier,
+        n_results=payload.n_results
+    )
+    return {
+        "query": payload.query,
+        "course_id": payload.course_id,
+        "chapter_id": payload.chapter_id,
+        "chapter_index": payload.chapter_index,
+        "results": context,
+        "count": len(context)
+    }
+
+
+@app.get("/api/material/course/{course_id}/chapters")
+async def get_course_chapters_index(course_id: str):
+    """
+    Returns structured chapter navigation index for a course to enable clean chapter browsing.
+    """
+    course = CourseManager.get_course_by_id(course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    chapters = course.get("chapters", [])
+    index = [{
+        "chapter_id": ch.get("chapter_id", f"ch_{i}"),
+        "chapter_index": ch.get("chapter_index", i),
+        "title": ch.get("title", f"Chapter {i}"),
+        "summary": ch.get("summary", ""),
+        "objectives": ch.get("objectives", []),
+        "cards_count": len(ch.get("cards", [])),
+        "sections_count": ch.get("sections_count", len(ch.get("section_texts", []))),
+        "theory_source": ch.get("theory_source", "deterministic")
+    } for i, ch in enumerate(chapters, 1)]
+    return {
+        "course_id": course_id,
+        "course_title": course.get("title"),
+        "total_chapters": len(index),
+        "chapters": index
+    }
+
+
+@app.get("/api/material/course/{course_id}/chapter/{chapter_id}/context")
+async def get_chapter_specific_context(course_id: str, chapter_id: str, query: str = "core principles overview"):
+    """
+    Retrieves vector and hybrid RAG chunks strictly isolated to the specified chapter.
+    """
+    db_pipeline = get_db_pipeline()
+    chunks = db_pipeline.query_hybrid(
+        query=query,
+        course_id=course_id,
+        chapter_id=chapter_id,
+        n_results=6
+    )
+    return {
+        "course_id": course_id,
+        "chapter_id": chapter_id,
+        "query": query,
+        "chunks": chunks,
+        "count": len(chunks)
+    }
+
 @app.post("/api/tutor/chat")
 async def run_session_cycle(payload: ChatSessionPayload):
     """
@@ -1804,4 +1916,6 @@ async def get_student_trajectory_summary(student_id: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=False)
+    port = int(os.getenv("PORT", 8000))
+    host = os.getenv("HOST", "0.0.0.0")
+    uvicorn.run(app, host=host, port=port)

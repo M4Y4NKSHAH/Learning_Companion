@@ -1,6 +1,6 @@
 # 🧠 Learning Companion — System Architecture
 
-> **The "Agentic Socratic Tutoring Platform" (AURA)**  
+> **The "Agentic Socratic Tutoring Platform" (LearnerHelp)**  
 > A multi-agent adaptive educational platform featuring:
 > 1. **Pedagogical & Information Guardrails** that enforce strict academic tier ceilings (preventing Class 12 calculus/formalisms from leaking into Class 9) and deflect off-topic queries.
 > 2. **Authoritative Course Grounding** using ingested textbooks as the Primary Ground Truth via Hybrid RAG (BM25 + ChromaDB) with zero cross-chapter leakage.

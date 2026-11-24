@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { API_BASE } from '../config';
 import { 
   Upload, 
   FileText, 
@@ -107,7 +108,7 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
 
     pollIntervalRef.current = setInterval(async () => {
       try {
-        const res = await fetch(`http://127.0.0.1:8000/api/material/job/${jobId}/status`);
+        const res = await fetch(`${API_BASE}/api/material/job/${jobId}/status`);
         if (!res.ok) return;
 
         const job = await res.json();
@@ -222,7 +223,7 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
         const enrichCount = getEnrichCount();
         if (enrichCount !== null) formData.append('enrich_count', String(enrichCount));
 
-        response = await fetch('http://127.0.0.1:8000/api/material/upload', {
+        response = await fetch(`${API_BASE}/api/material/upload`, {
           method: 'POST',
           body: formData,
         });
@@ -237,7 +238,7 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
         };
         const enrichCount = getEnrichCount();
         if (enrichCount !== null) body.enrich_count = enrichCount;
-        response = await fetch('http://127.0.0.1:8000/api/material/ingest', {
+        response = await fetch(`${API_BASE}/api/material/ingest`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
@@ -284,7 +285,7 @@ export default function MaterialIngestionModal({ isOpen, onClose, onIngestionSuc
       console.error("Ingestion submit error:", err);
       let message = err.message || 'An error occurred during material processing.';
       if (message.includes('Failed to fetch') || message.includes('NetworkError')) {
-        message = 'Could not connect to backend server. Please verify backend is running on http://127.0.0.1:8000.';
+        message = `Could not connect to backend server. Please verify backend is running at ${API_BASE}.`;
       }
       setErrorMsg(message);
       setIsProcessing(false);

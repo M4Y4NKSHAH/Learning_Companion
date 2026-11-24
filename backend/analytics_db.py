@@ -3,7 +3,11 @@ import sqlite3
 import datetime
 from typing import Dict, List, Any, Optional
 
-DB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+_data_dir = os.getenv("DATA_DIR")
+if _data_dir:
+    DB_DIR = _data_dir
+else:
+    DB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 os.makedirs(DB_DIR, exist_ok=True)
 DB_PATH = os.path.join(DB_DIR, "analytics.db")
 
